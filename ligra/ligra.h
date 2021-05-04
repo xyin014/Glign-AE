@@ -530,6 +530,7 @@ int parallel_main(int argc, char* argv[]) {
 
   
   if (symmetric) {
+    cout << "symmetric graph\n";
     graph<symmetricVertex> G =
       readGraph<symmetricVertex>(iFile,compressed,symmetric,binary,mmap); //symmetric graph
     // for(int r=0;r<rounds;r++) {
@@ -573,6 +574,7 @@ int parallel_main(int argc, char* argv[]) {
     // }
     G.del();
   } else {
+    cout << "asymmetric graph\n";
     graph<asymmetricVertex> G =
       readGraph<asymmetricVertex>(iFile,compressed,symmetric,binary,mmap); //asymmetric graph
 
