@@ -22,10 +22,14 @@ ifdef LOWMEM
 MEM = -DLOWMEM
 endif
 
+ifdef OUTPUT
+OUTPUT = -DOUTPUT
+endif
+
 #compilers
 ifdef CILK
 PCC = g++
-PCFLAGS = -std=c++14 -fcilkplus -lcilkrts -O3 -DCILK $(INTT) $(INTE) $(CODE) $(PD) $(MEM)
+PCFLAGS = -std=c++14 -fcilkplus -lcilkrts -O3 -DCILK $(INTT) $(INTE) $(CODE) $(PD) $(MEM) $(OUTPUT)
 PLFLAGS = -fcilkplus -lcilkrts
 
 else ifdef MKLROOT

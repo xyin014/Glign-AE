@@ -29,6 +29,15 @@
 #include <cstring>
 #include <string>
 #include <algorithm>
+#include <vector>
+#include <chrono>
+#include <thread>
+#include <cmath>
+#include <random>
+#include <queue>
+#include <map>
+#include <algorithm>
+
 #include "parallel.h"
 #include "gettime.h"
 #include "utils.h"
@@ -43,6 +52,9 @@
 using namespace std;
 
 //*****START FRAMEWORK*****
+#define MAXPATH 10000
+#define MAXLEVEL 10000
+#define MAXWIDTH 10000
 
 typedef uint32_t flags;
 const flags no_output = 1;
@@ -259,6 +271,7 @@ vertexSubsetData<data> edgeMapData(graph<vertex>& GA, VS &vs, F f,
     if (outDegrees == 0) return vertexSubsetData<data>(numVertices);
   }
   if (!(fl & no_dense) && m + outDegrees > threshold) {
+    cout << "dense mod\n";
     if(degrees) free(degrees);
     if(frontierVertices) free(frontierVertices);
     vs.toDense();
@@ -467,6 +480,11 @@ template<class vertex>
 void Compute(graph<vertex>&, commandLine);
 
 template<class vertex>
+void Compute(graph<vertex>&, vector<long>, commandLine);
+template<class vertex>
+void Compute_Delay(graph<vertex>&, vector<long>, commandLine, vector<int>);
+
+template<class vertex>
 void Compute(hypergraph<vertex>&, commandLine);
 
 int parallel_main(int argc, char* argv[]) {
@@ -477,75 +495,124 @@ int parallel_main(int argc, char* argv[]) {
   bool binary = P.getOptionValue("-b");
   bool mmap = P.getOptionValue("-m");
   //cout << "mmap = " << mmap << endl;
-  long rounds = P.getOptionLongValue("-rounds",3);
-  if (compressed) {
-    if (symmetric) {
-#ifndef HYPER
-      graph<compressedSymmetricVertex> G =
-        readCompressedGraph<compressedSymmetricVertex>(iFile,symmetric,mmap); //symmetric graph
-#else
-      hypergraph<compressedSymmetricVertex> G =
-        readCompressedHypergraph<compressedSymmetricVertex>(iFile,symmetric,mmap); //symmetric graph
-#endif
-      Compute(G,P);
-      for(int r=0;r<rounds;r++) {
-        startTime();
-        Compute(G,P);
-        nextTime("Running time");
+  long rounds = P.getOptionLongValue("-rounds",1);
+
+  string queryFileName = string(P.getOptionValue("-qf", ""));
+  int combination_max = P.getOptionLongValue("-max_combination", 256);
+  size_t bSize = P.getOptionLongValue("-batch", 4);
+
+  cout << "graph file name: " << iFile << endl;
+  cout << "query file name: " << queryFileName << endl;
+
+  // Initialization and preprocessing
+  std::vector<long> userQueries; 
+  long start = -1;
+  char inFileName[300];
+  ifstream inFile;
+  sprintf(inFileName, queryFileName.c_str());
+  inFile.open(inFileName, ios::in);
+  while (inFile >> start) {
+    userQueries.push_back(start);
+  }
+  inFile.close();
+
+  // randomly shuffled each run
+  std::random_device rd;
+  auto rng = std::default_random_engine { rd() };
+  // auto rng = std::default_random_engine {};
+  std::shuffle(std::begin(userQueries), std::end(userQueries), rng);
+
+  cout << "number of random queries: " << userQueries.size() << endl;
+  int batch_size = userQueries.size();
+  // for (auto a : userQueries) {
+  //   cout << a << endl;
+  // }
+
+  
+  if (symmetric) {
+    graph<symmetricVertex> G =
+      readGraph<symmetricVertex>(iFile,compressed,symmetric,binary,mmap); //symmetric graph
+    // for(int r=0;r<rounds;r++) {
+
+    vector<long> batchedQuery;
+    batchedQuery = userQueries;
+    cout << "=================\n";
+    for (int i = 0; i < combination_max; i++) {
+      timer t_seq, t_batch;
+      std::shuffle(std::begin(batchedQuery), std::end(batchedQuery), rng);
+      vector<long> tmp_batch;
+      cout << "Evaluating queries: ";
+      for (int j = 0; j < bSize; j++) {
+        long tmp_query_id = batchedQuery[j];
+        tmp_batch.push_back(tmp_query_id);
+        cout << tmp_query_id << " ";
       }
-      G.del();
-    } else {
-#ifndef HYPER
-      graph<compressedAsymmetricVertex> G =
-        readCompressedGraph<compressedAsymmetricVertex>(iFile,symmetric,mmap); //asymmetric graph
-#else
-      hypergraph<compressedAsymmetricVertex> G =
-        readCompressedHypergraph<compressedAsymmetricVertex>(iFile,symmetric,mmap); //asymmetric graph
-#endif
-      Compute(G,P);
-      if(G.transposed) G.transpose();
-      for(int r=0;r<rounds;r++) {
-        startTime();
-        Compute(G,P);
-        nextTime("Running time");
-        if(G.transposed) G.transpose();
+      cout << endl;
+
+      t_seq.start();
+      for (int j = 0; j < tmp_batch.size(); j++) {
+        vector<long> tmp_single_query;
+        tmp_single_query.push_back(tmp_batch[j]);
+        Compute(G,tmp_single_query,P);
       }
-      G.del();
+      t_seq.stop();
+
+      t_batch.start();
+      Compute(G,tmp_batch,P);
+      t_batch.stop();
+
+      double seq_time = t_seq.totalTime;
+      double batch_time = t_batch.totalTime;
+      t_seq.reportTotal("sequential time");
+      t_batch.reportTotal("batch evaluation time");
+      cout << "Batching speedup: " << seq_time / batch_time << endl;
+
+      cout << "=================\n";
     }
+      
+    // }
+    G.del();
   } else {
-    if (symmetric) {
-#ifndef HYPER
-      graph<symmetricVertex> G =
-        readGraph<symmetricVertex>(iFile,compressed,symmetric,binary,mmap); //symmetric graph
-#else
-      hypergraph<symmetricVertex> G =
-        readHypergraph<symmetricVertex>(iFile,compressed,symmetric,binary,mmap); //symmetric graph
-#endif
-      Compute(G,P);
-      for(int r=0;r<rounds;r++) {
-        startTime();
-        Compute(G,P);
-        nextTime("Running time");
+    graph<asymmetricVertex> G =
+      readGraph<asymmetricVertex>(iFile,compressed,symmetric,binary,mmap); //asymmetric graph
+
+    vector<long> batchedQuery;
+    batchedQuery = userQueries;
+    cout << "=================\n";
+    for (int i = 0; i < combination_max; i++) {
+      timer t_seq, t_batch;
+      std::shuffle(std::begin(batchedQuery), std::end(batchedQuery), rng);
+      vector<long> tmp_batch;
+      cout << "Evaluating queries: ";
+      for (int j = 0; j < bSize; j++) {
+        long tmp_query_id = batchedQuery[j];
+        tmp_batch.push_back(tmp_query_id);
+        cout << tmp_query_id << " ";
       }
-      G.del();
-    } else {
-#ifndef HYPER
-      graph<asymmetricVertex> G =
-        readGraph<asymmetricVertex>(iFile,compressed,symmetric,binary,mmap); //asymmetric graph
-#else
-      hypergraph<asymmetricVertex> G =
-        readHypergraph<asymmetricVertex>(iFile,compressed,symmetric,binary,mmap); //asymmetric graph
-#endif
-      Compute(G,P);
-      if(G.transposed) G.transpose();
-      for(int r=0;r<rounds;r++) {
-        startTime();
-        Compute(G,P);
-        nextTime("Running time");
-        if(G.transposed) G.transpose();
+      cout << endl;
+
+      t_seq.start();
+      for (int j = 0; j < tmp_batch.size(); j++) {
+        vector<long> tmp_single_query;
+        tmp_single_query.push_back(tmp_batch[j]);
+        Compute(G,tmp_single_query,P);
       }
-      G.del();
+      t_seq.stop();
+
+      t_batch.start();
+      Compute(G,tmp_batch,P);
+      t_batch.stop();
+
+      double seq_time = t_seq.totalTime;
+      double batch_time = t_batch.totalTime;
+      t_seq.reportTotal("sequential time");
+      t_batch.reportTotal("batch evaluation time");
+      cout << "Batching speedup: " << seq_time / batch_time << endl;
+
+      cout << "=================\n";
     }
+
+    G.del();
   }
 }
 #endif
