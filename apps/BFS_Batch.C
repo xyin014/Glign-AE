@@ -73,7 +73,55 @@ struct BFSLV_F {
 };
 
 template <class vertex>
-uintE* Compute(graph<vertex>& G, std::vector<long> vecQueries, commandLine P, bool ret) {
+uintE* Compute_Eval(graph<vertex>& G, std::vector<long> vecQueries, commandLine P) {
+  size_t n = G.n;
+  size_t edge_count = G.m;
+  long batch_size = vecQueries.size();
+  IdxType totalNumVertices = (IdxType)n * (IdxType)batch_size;
+  uintE* Levels = pbbs::new_array<uintE>(totalNumVertices);
+  bool* CurrActiveArray = pbbs::new_array<bool>(totalNumVertices);
+  bool* NextActiveArray = pbbs::new_array<bool>(totalNumVertices);
+  bool* frontier = pbbs::new_array<bool>(n);
+  parallel_for(size_t i = 0; i < n; i++) {
+    frontier[i] = false;
+  }
+  for(long i = 0; i < batch_size; i++) {
+    frontier[vecQueries[i]] = true;
+  }
+  parallel_for(IdxType i = 0; i < totalNumVertices; i++) {
+    Levels[i] = (uintE)MAXLEVEL;
+    CurrActiveArray[i] = false;
+    NextActiveArray[i] = false;
+  }
+  for(long i = 0; i < batch_size; i++) {
+    Levels[(IdxType)batch_size * (IdxType)vecQueries[i] + (IdxType)i] = 0;
+  }
+  parallel_for(size_t i = 0; i < batch_size; i++) {
+    CurrActiveArray[(IdxType)vecQueries[i] * (IdxType)batch_size + (IdxType)i] = true;
+  }
+
+  vertexSubset Frontier(n, frontier);
+  while(!Frontier.isEmpty()){
+    // mode: no_dense, remove_duplicates (for batch size > 1)
+    vertexSubset output = edgeMap(G, Frontier, BFSLV_F(Levels, CurrActiveArray, NextActiveArray, batch_size), -1, no_dense|remove_duplicates);
+
+    Frontier.del();
+    Frontier = output;
+
+    std::swap(CurrActiveArray, NextActiveArray);
+    parallel_for(IdxType i = 0; i < totalNumVertices; i++) {
+      NextActiveArray[i] = false;
+    }
+  }
+
+  Frontier.del();
+  pbbs::delete_array(CurrActiveArray, totalNumVertices);
+  pbbs::delete_array(NextActiveArray, totalNumVertices);
+  return Levels;
+}
+
+template <class vertex>
+void Compute_Base(graph<vertex>& G, std::vector<long> vecQueries, commandLine P) {
   size_t n = G.n;
   size_t edge_count = G.m;
   long batch_size = vecQueries.size();
@@ -154,13 +202,7 @@ uintE* Compute(graph<vertex>& G, std::vector<long> vecQueries, commandLine P, bo
   pbbs::delete_array(CurrActiveArray, totalNumVertices);
   pbbs::delete_array(NextActiveArray, totalNumVertices);
   pbbs::delete_array(overlaps, batch_size);
-
-  if (ret) {
-    return Levels;
-  } else {
-    pbbs::delete_array(Levels, totalNumVertices);
-  }
-  return nullptr;
+  pbbs::delete_array(Levels, totalNumVertices);
 }
 
 template <class vertex>
