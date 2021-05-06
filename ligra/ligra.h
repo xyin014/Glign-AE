@@ -482,9 +482,9 @@ void Compute(graph<vertex>&, commandLine);
 template<class vertex>
 uintE* Compute_Eval(graph<vertex>&, vector<long>, commandLine);
 template<class vertex>
-void Compute_Base(graph<vertex>&, vector<long>, commandLine);
+void Compute_Base(graph<vertex>&, vector<long>, commandLine, bool should_profile=false);
 template<class vertex>
-void Compute_Delay(graph<vertex>&, vector<long>, commandLine, vector<int>);
+void Compute_Delay(graph<vertex>&, vector<long>, commandLine, vector<int>, bool should_profile=false);
 
 template<class vertex>
 void Compute(hypergraph<vertex>&, commandLine);
@@ -637,6 +637,11 @@ int parallel_main(int argc, char* argv[]) {
 
       cout << "Batching speedup: " << seq_time / batch_time << endl;
       cout << "Delayed batching speedup: " << seq_time / delay_time << endl;
+
+      // profiling the affinities
+      Compute_Base(G,tmp_batch,P,true);
+      Compute_Delay(G,tmp_batch,P,dist_to_high,true);
+
       cout << "=================\n";
     }
       
@@ -709,20 +714,19 @@ int parallel_main(int argc, char* argv[]) {
       }
       cout << endl;
 
-      // Sequential
-      t_seq.start();
-      for (int j = 0; j < tmp_batch.size(); j++) {
-        vector<long> tmp_single_query;
-        tmp_single_query.push_back(tmp_batch[j]);
-        Compute_Base(G,tmp_single_query,P);
-      }
-      t_seq.stop();
+      // // Sequential
+      // t_seq.start();
+      // for (int j = 0; j < tmp_batch.size(); j++) {
+      //   vector<long> tmp_single_query;
+      //   tmp_single_query.push_back(tmp_batch[j]);
+      //   Compute_Base(G,tmp_single_query,P);
+      // }
+      // t_seq.stop();
 
-      // Batching
-      t_batch.start();
-      Compute_Base(G,tmp_batch,P);
-      t_batch.stop();
-
+      // // Batching
+      // t_batch.start();
+      // Compute_Base(G,tmp_batch,P);
+      // t_batch.stop();
 
       // Delayed batching
       vector<int> dist_to_high;
@@ -741,18 +745,41 @@ int parallel_main(int argc, char* argv[]) {
       cout << "Total delays (delta): " << total_delays << endl;
 
       t_delay.start();
-      Compute_Delay(G,tmp_batch,P,dist_to_high);
+      for (int r = 0; r < rounds; r++) {
+        Compute_Delay(G,tmp_batch,P,dist_to_high);
+      }
       t_delay.stop();
 
+      // Batching
+      t_batch.start();
+      for (int r = 0; r < rounds; r++) {
+        Compute_Base(G,tmp_batch,P);
+      }
+      t_batch.stop();
+
+      // Sequential
+      t_seq.start();
+      for (int j = 0; j < tmp_batch.size(); j++) {
+        vector<long> tmp_single_query;
+        tmp_single_query.push_back(tmp_batch[j]);
+        Compute_Base(G,tmp_single_query,P);
+      }
+      t_seq.stop();
+
       double seq_time = t_seq.totalTime;
-      double batch_time = t_batch.totalTime;
-      double delay_time = t_delay.totalTime;
+      double batch_time = t_batch.totalTime / rounds;
+      double delay_time = t_delay.totalTime / rounds;
       t_seq.reportTotal("sequential time");
       t_batch.reportTotal("batching evaluation time");
       t_delay.reportTotal("delayed batching evaluation time");
 
       cout << "Batching speedup: " << seq_time / batch_time << endl;
       cout << "Delayed batching speedup: " << seq_time / delay_time << endl;
+
+      // profiling the affinities
+      Compute_Base(G,tmp_batch,P,true);
+      Compute_Delay(G,tmp_batch,P,dist_to_high,true);
+
       cout << "=================\n";
     }
       
