@@ -714,19 +714,19 @@ int parallel_main(int argc, char* argv[]) {
       }
       cout << endl;
 
-      // // Sequential
-      // t_seq.start();
-      // for (int j = 0; j < tmp_batch.size(); j++) {
-      //   vector<long> tmp_single_query;
-      //   tmp_single_query.push_back(tmp_batch[j]);
-      //   Compute_Base(G,tmp_single_query,P);
-      // }
-      // t_seq.stop();
+      // Sequential
+      t_seq.start();
+      for (int j = 0; j < tmp_batch.size(); j++) {
+        vector<long> tmp_single_query;
+        tmp_single_query.push_back(tmp_batch[j]);
+        Compute_Base(G,tmp_single_query,P);
+      }
+      t_seq.stop();
 
-      // // Batching
-      // t_batch.start();
-      // Compute_Base(G,tmp_batch,P);
-      // t_batch.stop();
+      // Batching
+      t_batch.start();
+      Compute_Base(G,tmp_batch,P);
+      t_batch.stop();
 
       // Delayed batching
       vector<int> dist_to_high;
@@ -750,21 +750,21 @@ int parallel_main(int argc, char* argv[]) {
       }
       t_delay.stop();
 
-      // Batching
-      t_batch.start();
-      for (int r = 0; r < rounds; r++) {
-        Compute_Base(G,tmp_batch,P);
-      }
-      t_batch.stop();
+      // // Batching
+      // t_batch.start();
+      // for (int r = 0; r < rounds; r++) {
+      //   Compute_Base(G,tmp_batch,P);
+      // }
+      // t_batch.stop();
 
-      // Sequential
-      t_seq.start();
-      for (int j = 0; j < tmp_batch.size(); j++) {
-        vector<long> tmp_single_query;
-        tmp_single_query.push_back(tmp_batch[j]);
-        Compute_Base(G,tmp_single_query,P);
-      }
-      t_seq.stop();
+      // // Sequential
+      // t_seq.start();
+      // for (int j = 0; j < tmp_batch.size(); j++) {
+      //   vector<long> tmp_single_query;
+      //   tmp_single_query.push_back(tmp_batch[j]);
+      //   Compute_Base(G,tmp_single_query,P);
+      // }
+      // t_seq.stop();
 
       double seq_time = t_seq.totalTime;
       double batch_time = t_batch.totalTime / rounds;
