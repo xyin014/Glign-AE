@@ -325,6 +325,14 @@ inline bool writeMin(ET *a, ET b) {
 }
 
 template <class ET>
+inline bool writeMax(ET *a, ET b) {
+  ET c; bool r=0;
+  do c = *a;
+  while (c < b && !(r=CAS(a,c,b)));
+  return r;
+}
+
+template <class ET>
 inline void writeAdd(ET *a, ET b) {
   volatile ET newV, oldV;
   do {oldV = *a; newV = oldV + b;}

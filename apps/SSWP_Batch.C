@@ -26,6 +26,55 @@
 
 using IdxType = long long;
 
+struct SSWP_F {
+  intE* WidestPathVal;
+  bool* CurrActiveArray;
+  bool* NextActiveArray;
+  long BatchSize;
+
+  SSWP_F(intE* _WidestPathVal, bool* _CurrActiveArray, bool* _NextActiveArray, long _BatchSize) : 
+    WidestPathVal(_WidestPathVal), CurrActiveArray(_CurrActiveArray), NextActiveArray(_NextActiveArray), BatchSize(_BatchSize) {}
+  
+  inline bool update (uintE s, uintE d, intE edgeLen) { //Update
+    bool ret = false;
+    IdxType s_begin = s * BatchSize;
+    IdxType d_begin = d * BatchSize;
+
+    for (long j = 0; j < BatchSize; j++) {
+      if (CurrActiveArray[s_begin + j]) {
+        intE sValue = WidestPathVal[s_begin + j];
+        intE dValue = WidestPathVal[d_begin + j];
+        intE newValue = std::min(sValue, edgeLen);
+        if (dValue < newValue) {
+          // Visited[d_begin + j] = true;
+          WidestPathVal[d_begin + j] = newValue;
+          NextActiveArray[d_begin + j] = true;
+          ret = true;
+        }
+      }
+    }
+    return ret;
+  }
+  
+  inline bool updateAtomic (uintE s, uintE d, intE edgeLen){ //atomic version of Update
+    bool ret = false;
+    IdxType s_begin = s * BatchSize;
+    IdxType d_begin = d * BatchSize;
+    for (long j = 0; j < BatchSize; j++) {
+      if (CurrActiveArray[s_begin + j]) {
+        intE sValue = WidestPathVal[s_begin + j];
+        intE newValue = std::min(sValue, edgeLen);
+        if (writeMax(&WidestPathVal[d_begin + j], newValue) && CAS(&NextActiveArray[d_begin + j], false, true)) {
+          ret = true;
+        }
+      }
+    }
+    return ret;
+  }
+  //cond function checks if vertex has been visited yet
+  inline bool cond (uintE d) { return cond_true(d); } 
+};
+
 struct BFSLV_F {
   uintE* Levels;
   bool* CurrActiveArray;
@@ -127,7 +176,7 @@ void Compute_Base(graph<vertex>& G, std::vector<long> vecQueries, commandLine P,
   size_t edge_count = G.m;
   long batch_size = vecQueries.size();
   IdxType totalNumVertices = (IdxType)n * (IdxType)batch_size;
-  uintE* Levels = pbbs::new_array<uintE>(totalNumVertices);
+  intE* WidestPathVal = pbbs::new_array<intE>(totalNumVertices);
   bool* CurrActiveArray = pbbs::new_array<bool>(totalNumVertices);
   bool* NextActiveArray = pbbs::new_array<bool>(totalNumVertices);
   bool* frontier = pbbs::new_array<bool>(n);
@@ -138,12 +187,12 @@ void Compute_Base(graph<vertex>& G, std::vector<long> vecQueries, commandLine P,
     frontier[vecQueries[i]] = true;
   }
   parallel_for(IdxType i = 0; i < totalNumVertices; i++) {
-    Levels[i] = (uintE)MAXLEVEL;
+    WidestPathVal[i] = (intE)0;
     CurrActiveArray[i] = false;
     NextActiveArray[i] = false;
   }
   for(long i = 0; i < batch_size; i++) {
-    Levels[(IdxType)batch_size * (IdxType)vecQueries[i] + (IdxType)i] = 0;
+    WidestPathVal[(IdxType)batch_size * (IdxType)vecQueries[i] + (IdxType)i] = (intE)MAXWIDTH;
   }
   parallel_for(size_t i = 0; i < batch_size; i++) {
     CurrActiveArray[(IdxType)vecQueries[i] * (IdxType)batch_size + (IdxType)i] = true;
@@ -170,6 +219,11 @@ void Compute_Base(graph<vertex>& G, std::vector<long> vecQueries, commandLine P,
   size_t peak_activation = 0;
   int peak_iter = 0;
 
+  // vector<long> frontier_iterations;
+  // vector<long> overlapped_iterations;
+  // vector<long> accumulated_overlapped_iterations;
+  // vector<long> total_activated_iterations;
+
   while(!Frontier.isEmpty()){
     iteration++;
     totalActivated += Frontier.size();
@@ -180,6 +234,7 @@ void Compute_Base(graph<vertex>& G, std::vector<long> vecQueries, commandLine P,
         peak_activation = Frontier.size();
         peak_iter = iteration;
       }
+
       bool* overlap_set = pbbs::new_array<bool>(n); // activated for all queries
       bool* overlap_set_one = pbbs::new_array<bool>(n); // only activated for at least half of queries
       bool* overlap_set_only = pbbs::new_array<bool>(n);
@@ -242,10 +297,15 @@ void Compute_Base(graph<vertex>& G, std::vector<long> vecQueries, commandLine P,
       pbbs::delete_array(overlap_set, n);
       pbbs::delete_array(overlap_set_one, n);
       pbbs::delete_array(overlap_set_only, n);
+
+      // frontier_iterations.push_back(Frontier.size());
+      // overlapped_iterations.push_back(overlap_size);
+      // accumulated_overlapped_iterations.push_back(accumulated_overlap);
+      // total_activated_iterations.push_back(totalActivated);
     }
 
     // mode: no_dense, remove_duplicates (for batch size > 1)
-    vertexSubset output = edgeMap(G, Frontier, BFSLV_F(Levels, CurrActiveArray, NextActiveArray, batch_size), -1, no_dense|remove_duplicates);
+    vertexSubset output = edgeMap(G, Frontier, SSWP_F(WidestPathVal, CurrActiveArray, NextActiveArray, batch_size), -1, no_dense|remove_duplicates);
 
     Frontier.del();
     Frontier = output;
@@ -297,32 +357,62 @@ void Compute_Base(graph<vertex>& G, std::vector<long> vecQueries, commandLine P,
     
     cout << "Base Iteration's overlap scores: " << endl;
     for (int i = 0; i < overlap_scores.size(); i++) {
-        cout << overlap_scores[i] << " ";
+      cout << overlap_scores[i] << " ";
     }
     cout << endl;
     int maxElementIndex = std::max_element(overlap_scores.begin(),overlap_scores.end()) - overlap_scores.begin();
     double maxElement = *std::max_element(overlap_scores.begin(), overlap_scores.end());
     cout << "Base Max overlap score and iteration: " << maxElementIndex+1 << " " << maxElement << endl;
+    
+    // // todo: remove
+    // // vector<long> frontier_iterations;
+    // // vector<long> overlapped_iterations;
+    // // vector<long> accumulated_overlapped_iterations;
+    // // vector<long> total_activated_iterations;
+    // cout << "Base frontier size per iteration: " << endl;
+    // for (int i = 0; i < frontier_iterations.size(); i++) {
+    //   cout << frontier_iterations[i] << " ";
+    // }
+    // cout << endl;
+
+    // cout << "Base overlapped size per iteration: " << endl;
+    // for (int i = 0; i < overlapped_iterations.size(); i++) {
+    //   cout << overlapped_iterations[i] << " ";
+    // }
+    // cout << endl;
+
+    // cout << "Base accumulated overlapped size per iteration: " << endl;
+    // for (int i = 0; i < accumulated_overlapped_iterations.size(); i++) {
+    //   cout << accumulated_overlapped_iterations[i] << " ";
+    // }
+    // cout << endl;
+
+    // cout << "Base total activated size per iteration: " << endl;
+    // for (int i = 0; i < total_activated_iterations.size(); i++) {
+    //   cout << total_activated_iterations[i] << " ";
+    // }
+    // cout << endl;
+
   }
 
 #ifdef OUTPUT 
   for (int i = 0; i < batch_size; i++) {
     long start = vecQueries[i];
     char outFileName[300];
-    sprintf(outFileName, "BFSLV_base_output_src%ld.%ld.%ld.out", start, edge_count, batch_size);
+    sprintf(outFileName, "SSWP_base_output_src%ld.%ld.%ld.out", start, edge_count, batch_size);
     FILE *fp;
     fp = fopen(outFileName, "w");
     for (long j = 0; j < n; j++)
-      fprintf(fp, "%ld %d\n", j, Levels[j * batch_size + i]);
+      fprintf(fp, "%ld %d\n", j, WidestPathVal[j * batch_size + i]);
     fclose(fp);
   }
 #endif
 
   Frontier.del();
+  pbbs::delete_array(WidestPathVal, totalNumVertices);
   pbbs::delete_array(CurrActiveArray, totalNumVertices);
   pbbs::delete_array(NextActiveArray, totalNumVertices);
   pbbs::delete_array(overlaps, batch_size);
-  pbbs::delete_array(Levels, totalNumVertices);
 }
 
 template <class vertex>
@@ -331,7 +421,7 @@ void Compute_Delay(graph<vertex>& G, std::vector<long> vecQueries, commandLine P
   size_t edge_count = G.m;
   long batch_size = vecQueries.size();
   IdxType totalNumVertices = (IdxType)n * (IdxType)batch_size;
-  uintE* Levels = pbbs::new_array<uintE>(totalNumVertices);
+  intE* WidestPathVal = pbbs::new_array<intE>(totalNumVertices);
   bool* CurrActiveArray = pbbs::new_array<bool>(totalNumVertices);
   bool* NextActiveArray = pbbs::new_array<bool>(totalNumVertices);
   bool* frontier = pbbs::new_array<bool>(n);
@@ -340,7 +430,7 @@ void Compute_Delay(graph<vertex>& G, std::vector<long> vecQueries, commandLine P
   }
   // for delaying initialization
   for(long i = 0; i < batch_size; i++) {
-    if (defer_vec[i] == 0 || defer_vec[i] > 1000) {
+    if (defer_vec[i] == 0) {
       frontier[vecQueries[i]] = true;
     }
   }
@@ -348,15 +438,15 @@ void Compute_Delay(graph<vertex>& G, std::vector<long> vecQueries, commandLine P
   //   frontier[vecQueries[i]] = true;
   // }
   parallel_for(IdxType i = 0; i < totalNumVertices; i++) {
-    Levels[i] = (uintE)MAXLEVEL;
+    WidestPathVal[i] = (intE)0;
     CurrActiveArray[i] = false;
     NextActiveArray[i] = false;
   }
   for(long i = 0; i < batch_size; i++) {
-    Levels[(IdxType)batch_size * (IdxType)vecQueries[i] + (IdxType)i] = 0;
+    WidestPathVal[(IdxType)batch_size * (IdxType)vecQueries[i] + (IdxType)i] = (intE)MAXWIDTH;
   }
   parallel_for(size_t i = 0; i < batch_size; i++) {
-    if (defer_vec[i] == 0 || defer_vec[i] > 1000) {
+    if (defer_vec[i] == 0) {
       CurrActiveArray[(IdxType)vecQueries[i] * (IdxType)batch_size + (IdxType)i] = true;
     }
   }
@@ -381,6 +471,11 @@ void Compute_Delay(graph<vertex>& G, std::vector<long> vecQueries, commandLine P
   size_t accumulated_overlap_only= 0;
   size_t peak_activation = 0;
   int peak_iter = 0;
+
+  // vector<long> frontier_iterations;
+  // vector<long> overlapped_iterations;
+  // vector<long> accumulated_overlapped_iterations;
+  // vector<long> total_activated_iterations;
 
   while(!Frontier.isEmpty()){
     iteration++;
@@ -454,10 +549,15 @@ void Compute_Delay(graph<vertex>& G, std::vector<long> vecQueries, commandLine P
       pbbs::delete_array(overlap_set, n);
       pbbs::delete_array(overlap_set_one, n);
       pbbs::delete_array(overlap_set_only, n);
+
+      // frontier_iterations.push_back(Frontier.size());
+      // overlapped_iterations.push_back(overlap_size);
+      // accumulated_overlapped_iterations.push_back(accumulated_overlap);
+      // total_activated_iterations.push_back(totalActivated);
     }
 
     // mode: no_dense, remove_duplicates (for batch size > 1)
-    vertexSubset output = edgeMap(G, Frontier, BFSLV_F(Levels, CurrActiveArray, NextActiveArray, batch_size), -1, no_dense|remove_duplicates);
+    vertexSubset output = edgeMap(G, Frontier, SSWP_F(WidestPathVal, CurrActiveArray, NextActiveArray, batch_size), -1, no_dense|remove_duplicates);
 
     Frontier.del();
     Frontier = output;
@@ -471,7 +571,6 @@ void Compute_Delay(graph<vertex>& G, std::vector<long> vecQueries, commandLine P
     // parallel_for(size_t i = 0; i < n; i++) {
     //   new_d[i] = Frontier.d[i];
     // }
-    bool isFEmpty = Frontier.isEmpty();
     Frontier.toDense();
     bool* new_d = Frontier.d;
     Frontier.d = nullptr;
@@ -479,13 +578,7 @@ void Compute_Delay(graph<vertex>& G, std::vector<long> vecQueries, commandLine P
       if (defer_vec[i] == iteration) {
         new_d[vecQueries[i]] = true;
         NextActiveArray[(IdxType)vecQueries[i] * (IdxType)batch_size + (IdxType)i] = true;
-      } 
-      // else {
-      //   if (isFEmpty && defer_vec[i] > iteration) {
-      //     new_d[vecQueries[i]] = true;
-      //     NextActiveArray[(IdxType)vecQueries[i] * (IdxType)batch_size + (IdxType)i] = true;
-      //   }
-      // }
+      }
     }
     vertexSubset Frontier_new(n, new_d);
     Frontier.del();
@@ -546,17 +639,46 @@ void Compute_Delay(graph<vertex>& G, std::vector<long> vecQueries, commandLine P
     int maxElementIndex = std::max_element(overlap_scores.begin(),overlap_scores.end()) - overlap_scores.begin();
     double maxElement = *std::max_element(overlap_scores.begin(), overlap_scores.end());
     cout << "Delay Max overlap score and iteration: " << maxElementIndex+1 << " " << maxElement << endl;
+  
+    // // todo: remove
+    // // vector<long> frontier_iterations;
+    // // vector<long> overlapped_iterations;
+    // // vector<long> accumulated_overlapped_iterations;
+    // // vector<long> total_activated_iterations;
+    // cout << "Delay frontier size per iteration: " << endl;
+    // for (int i = 0; i < frontier_iterations.size(); i++) {
+    //   cout << frontier_iterations[i] << " ";
+    // }
+    // cout << endl;
+
+    // cout << "Delay overlapped size per iteration: " << endl;
+    // for (int i = 0; i < overlapped_iterations.size(); i++) {
+    //   cout << overlapped_iterations[i] << " ";
+    // }
+    // cout << endl;
+
+    // cout << "Delay accumulated overlapped size per iteration: " << endl;
+    // for (int i = 0; i < accumulated_overlapped_iterations.size(); i++) {
+    //   cout << accumulated_overlapped_iterations[i] << " ";
+    // }
+    // cout << endl;
+
+    // cout << "Delay total activated size per iteration: " << endl;
+    // for (int i = 0; i < total_activated_iterations.size(); i++) {
+    //   cout << total_activated_iterations[i] << " ";
+    // }
+    // cout << endl;
   }
 
 #ifdef OUTPUT 
   for (int i = 0; i < batch_size; i++) {
     long start = vecQueries[i];
     char outFileName[300];
-    sprintf(outFileName, "BFSLV_delay_output_src%ld.%ld.%ld.out", start, edge_count, batch_size);
+    sprintf(outFileName, "SSWP_delay_output_src%ld.%ld.%ld.out", start, edge_count, batch_size);
     FILE *fp;
     fp = fopen(outFileName, "w");
     for (long j = 0; j < n; j++)
-      fprintf(fp, "%ld %d\n", j, Levels[j * batch_size + i]);
+      fprintf(fp, "%ld %d\n", j, WidestPathVal[j * batch_size + i]);
     fclose(fp);
   }
 #endif
@@ -565,6 +687,5 @@ void Compute_Delay(graph<vertex>& G, std::vector<long> vecQueries, commandLine P
   pbbs::delete_array(CurrActiveArray, totalNumVertices);
   pbbs::delete_array(NextActiveArray, totalNumVertices);
   pbbs::delete_array(overlaps, batch_size);
-  pbbs::delete_array(Levels, totalNumVertices);
-
+  pbbs::delete_array(WidestPathVal, totalNumVertices);
 }

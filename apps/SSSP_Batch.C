@@ -216,6 +216,11 @@ void Compute_Base(graph<vertex>& G, std::vector<long> vecQueries, commandLine P,
   size_t peak_activation = 0;
   int peak_iter = 0;
 
+  // vector<long> frontier_iterations;
+  // vector<long> overlapped_iterations;
+  // vector<long> accumulated_overlapped_iterations;
+  // vector<long> total_activated_iterations;
+
   while(!Frontier.isEmpty()){
     iteration++;
     totalActivated += Frontier.size();
@@ -226,6 +231,7 @@ void Compute_Base(graph<vertex>& G, std::vector<long> vecQueries, commandLine P,
         peak_activation = Frontier.size();
         peak_iter = iteration;
       }
+
       bool* overlap_set = pbbs::new_array<bool>(n); // activated for all queries
       bool* overlap_set_one = pbbs::new_array<bool>(n); // only activated for at least half of queries
       bool* overlap_set_only = pbbs::new_array<bool>(n);
@@ -288,6 +294,11 @@ void Compute_Base(graph<vertex>& G, std::vector<long> vecQueries, commandLine P,
       pbbs::delete_array(overlap_set, n);
       pbbs::delete_array(overlap_set_one, n);
       pbbs::delete_array(overlap_set_only, n);
+
+      // frontier_iterations.push_back(Frontier.size());
+      // overlapped_iterations.push_back(overlap_size);
+      // accumulated_overlapped_iterations.push_back(accumulated_overlap);
+      // total_activated_iterations.push_back(totalActivated);
     }
 
     // mode: no_dense, remove_duplicates (for batch size > 1)
@@ -343,12 +354,42 @@ void Compute_Base(graph<vertex>& G, std::vector<long> vecQueries, commandLine P,
     
     cout << "Base Iteration's overlap scores: " << endl;
     for (int i = 0; i < overlap_scores.size(); i++) {
-        cout << overlap_scores[i] << " ";
+      cout << overlap_scores[i] << " ";
     }
     cout << endl;
     int maxElementIndex = std::max_element(overlap_scores.begin(),overlap_scores.end()) - overlap_scores.begin();
     double maxElement = *std::max_element(overlap_scores.begin(), overlap_scores.end());
     cout << "Base Max overlap score and iteration: " << maxElementIndex+1 << " " << maxElement << endl;
+    
+    // // todo: remove
+    // // vector<long> frontier_iterations;
+    // // vector<long> overlapped_iterations;
+    // // vector<long> accumulated_overlapped_iterations;
+    // // vector<long> total_activated_iterations;
+    // cout << "Base frontier size per iteration: " << endl;
+    // for (int i = 0; i < frontier_iterations.size(); i++) {
+    //   cout << frontier_iterations[i] << " ";
+    // }
+    // cout << endl;
+
+    // cout << "Base overlapped size per iteration: " << endl;
+    // for (int i = 0; i < overlapped_iterations.size(); i++) {
+    //   cout << overlapped_iterations[i] << " ";
+    // }
+    // cout << endl;
+
+    // cout << "Base accumulated overlapped size per iteration: " << endl;
+    // for (int i = 0; i < accumulated_overlapped_iterations.size(); i++) {
+    //   cout << accumulated_overlapped_iterations[i] << " ";
+    // }
+    // cout << endl;
+
+    // cout << "Base total activated size per iteration: " << endl;
+    // for (int i = 0; i < total_activated_iterations.size(); i++) {
+    //   cout << total_activated_iterations[i] << " ";
+    // }
+    // cout << endl;
+
   }
 
 #ifdef OUTPUT 
@@ -428,6 +469,11 @@ void Compute_Delay(graph<vertex>& G, std::vector<long> vecQueries, commandLine P
   size_t peak_activation = 0;
   int peak_iter = 0;
 
+  // vector<long> frontier_iterations;
+  // vector<long> overlapped_iterations;
+  // vector<long> accumulated_overlapped_iterations;
+  // vector<long> total_activated_iterations;
+
   while(!Frontier.isEmpty()){
     iteration++;
     totalActivated += Frontier.size();
@@ -500,6 +546,11 @@ void Compute_Delay(graph<vertex>& G, std::vector<long> vecQueries, commandLine P
       pbbs::delete_array(overlap_set, n);
       pbbs::delete_array(overlap_set_one, n);
       pbbs::delete_array(overlap_set_only, n);
+
+      // frontier_iterations.push_back(Frontier.size());
+      // overlapped_iterations.push_back(overlap_size);
+      // accumulated_overlapped_iterations.push_back(accumulated_overlap);
+      // total_activated_iterations.push_back(totalActivated);
     }
 
     // mode: no_dense, remove_duplicates (for batch size > 1)
@@ -585,6 +636,35 @@ void Compute_Delay(graph<vertex>& G, std::vector<long> vecQueries, commandLine P
     int maxElementIndex = std::max_element(overlap_scores.begin(),overlap_scores.end()) - overlap_scores.begin();
     double maxElement = *std::max_element(overlap_scores.begin(), overlap_scores.end());
     cout << "Delay Max overlap score and iteration: " << maxElementIndex+1 << " " << maxElement << endl;
+  
+    // // todo: remove
+    // // vector<long> frontier_iterations;
+    // // vector<long> overlapped_iterations;
+    // // vector<long> accumulated_overlapped_iterations;
+    // // vector<long> total_activated_iterations;
+    // cout << "Delay frontier size per iteration: " << endl;
+    // for (int i = 0; i < frontier_iterations.size(); i++) {
+    //   cout << frontier_iterations[i] << " ";
+    // }
+    // cout << endl;
+
+    // cout << "Delay overlapped size per iteration: " << endl;
+    // for (int i = 0; i < overlapped_iterations.size(); i++) {
+    //   cout << overlapped_iterations[i] << " ";
+    // }
+    // cout << endl;
+
+    // cout << "Delay accumulated overlapped size per iteration: " << endl;
+    // for (int i = 0; i < accumulated_overlapped_iterations.size(); i++) {
+    //   cout << accumulated_overlapped_iterations[i] << " ";
+    // }
+    // cout << endl;
+
+    // cout << "Delay total activated size per iteration: " << endl;
+    // for (int i = 0; i < total_activated_iterations.size(); i++) {
+    //   cout << total_activated_iterations[i] << " ";
+    // }
+    // cout << endl;
   }
 
 #ifdef OUTPUT 
