@@ -686,16 +686,20 @@ void scenario3(int argc, char* argv[]) {
       long total_delays = 0;
       for (int j = 0; j < tmp_batch.size(); j++) {
         cout << "q" << j << " to highest deg vtx: " << distances[tmp_batch[j]] << endl;
-        dist_to_high.push_back(distances[tmp_batch[j]]);
+        if (distances[tmp_batch[j]] != MAXLEVEL) {
+          dist_to_high.push_back(distances[tmp_batch[j]]);
+        } else {
+          dist_to_high.push_back(-1);
+        }
       }
       int max_dist_to_high = *max_element(dist_to_high.begin(), dist_to_high.end());
 
       for (int j = 0; j < dist_to_high.size(); j++) {
-        if (dist_to_high[j] == MAXLEVEL) {
+        if (dist_to_high[j] == -1) {
           dist_to_high[j] = max_dist_to_high;
         }
       }
-      
+
       for (int j = 0; j < dist_to_high.size(); j++) {
         dist_to_high[j] = max_dist_to_high - dist_to_high[j];
         total_delays += dist_to_high[j];
@@ -812,12 +816,16 @@ void scenario3(int argc, char* argv[]) {
       long total_delays = 0;
       for (int j = 0; j < tmp_batch.size(); j++) {
         cout << "q" << j << " to highest deg vtx: " << distances[tmp_batch[j]] << endl;
-        dist_to_high.push_back(distances[tmp_batch[j]]);
+        if (distances[tmp_batch[j]] != MAXLEVEL) {
+          dist_to_high.push_back(distances[tmp_batch[j]]);
+        } else {
+          dist_to_high.push_back(-1);
+        }
       }
       int max_dist_to_high = *max_element(dist_to_high.begin(), dist_to_high.end());
 
       for (int j = 0; j < dist_to_high.size(); j++) {
-        if (dist_to_high[j] == MAXLEVEL) {
+        if (dist_to_high[j] == -1) {
           dist_to_high[j] = max_dist_to_high;
         }
       }
