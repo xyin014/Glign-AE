@@ -691,6 +691,12 @@ void scenario3(int argc, char* argv[]) {
       int max_dist_to_high = *max_element(dist_to_high.begin(), dist_to_high.end());
 
       for (int j = 0; j < dist_to_high.size(); j++) {
+        if (dist_to_high[j] == MAXLEVEL) {
+          dist_to_high[j] = max_dist_to_high;
+        }
+      }
+      
+      for (int j = 0; j < dist_to_high.size(); j++) {
         dist_to_high[j] = max_dist_to_high - dist_to_high[j];
         total_delays += dist_to_high[j];
         cout << "No. " << j << " defer " << dist_to_high[j] << " iterations\n";
