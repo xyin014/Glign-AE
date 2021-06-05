@@ -1697,7 +1697,7 @@ void scenario2(int argc, char* argv[]) {
     vector<long> truncatedQueries;
     vector<long> propertySortedQueries;
     tie(truncatedQueries, sortedQueries) = streamingPreprocessing(G, userQueries, n_high_deg, combination_max, P);
-    propertySortedQueries = reorderingByProperty(G, truncatedQueries, n_high_deg, P);
+    // propertySortedQueries = reorderingByProperty(G, truncatedQueries, n_high_deg, P);
 
     // start streaming.
     // input: G, P, bufferedQueries, batch size
@@ -1708,8 +1708,8 @@ void scenario2(int argc, char* argv[]) {
     cout << endl;
     cout << "\non the sorted buffer..\n";
     bufferStreaming(G, sortedQueries, bSize, P);
-    cout << "\non the property-based sorted buffer..\n";
-    bufferStreaming(G, propertySortedQueries, bSize, P);
+    // cout << "\non the property-based sorted buffer..\n";
+    // bufferStreaming(G, propertySortedQueries, bSize, P);
 
   } else {
     // For directed graph...
