@@ -1073,6 +1073,7 @@ void scenario3_fixed(int argc, char* argv[]) {
           Compute_Base(G,tmp_single_query,P);
           t_seq.stop();
           double seq_time = t_seq.totalTime;
+          cout << batchedQuery[i] << ": " << seq_time << endl;
           seq_eval_times.push_back(seq_time);
         }
     } else {
@@ -1287,11 +1288,11 @@ void scenario3_fixed(int argc, char* argv[]) {
         for (int i = start_from; i < query_length; i++) {
           timer t_seq; t_seq.start();
           vector<long> tmp_single_query;
-          cout << batchedQuery[i] << endl;
           tmp_single_query.push_back(batchedQuery[i]);
           Compute_Base(G,tmp_single_query,P);
           t_seq.stop();
           double seq_time = t_seq.totalTime;
+          cout << batchedQuery[i] << ": " << seq_time << endl;
           seq_eval_times.push_back(seq_time);
         }
     } else {
