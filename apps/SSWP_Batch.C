@@ -171,6 +171,59 @@ uintE* Compute_Eval(graph<vertex>& G, std::vector<long> vecQueries, commandLine 
 }
 
 template <class vertex>
+uintE* Compute_Eval_Prop(graph<vertex>& G, std::vector<long> vecQueries, commandLine P) {
+  size_t n = G.n;
+  size_t edge_count = G.m;
+  long batch_size = vecQueries.size();
+  IdxType totalNumVertices = (IdxType)n * (IdxType)batch_size;
+  intE* WidestPathVal = pbbs::new_array<intE>(totalNumVertices);
+  bool* CurrActiveArray = pbbs::new_array<bool>(totalNumVertices);
+  bool* NextActiveArray = pbbs::new_array<bool>(totalNumVertices);
+  bool* frontier = pbbs::new_array<bool>(n);
+  parallel_for(size_t i = 0; i < n; i++) {
+    frontier[i] = false;
+  }
+  for(long i = 0; i < batch_size; i++) {
+    frontier[vecQueries[i]] = true;
+  }
+  parallel_for(IdxType i = 0; i < totalNumVertices; i++) {
+    WidestPathVal[i] = (intE)0;
+    CurrActiveArray[i] = false;
+    NextActiveArray[i] = false;
+  }
+  for(long i = 0; i < batch_size; i++) {
+    WidestPathVal[(IdxType)batch_size * (IdxType)vecQueries[i] + (IdxType)i] = (intE)MAXWIDTH;
+  }
+  parallel_for(size_t i = 0; i < batch_size; i++) {
+    CurrActiveArray[(IdxType)vecQueries[i] * (IdxType)batch_size + (IdxType)i] = true;
+  }
+
+  vertexSubset Frontier(n, frontier);
+  while(!Frontier.isEmpty()){
+    // mode: no_dense, remove_duplicates (for batch size > 1)
+    vertexSubset output = edgeMap(G, Frontier, SSWP_F(WidestPathVal, CurrActiveArray, NextActiveArray, batch_size), -1, no_dense|remove_duplicates);
+
+    Frontier.del();
+    Frontier = output;
+
+    std::swap(CurrActiveArray, NextActiveArray);
+    parallel_for(IdxType i = 0; i < totalNumVertices; i++) {
+      NextActiveArray[i] = false;
+    }
+  }
+
+  Frontier.del();
+  pbbs::delete_array(CurrActiveArray, totalNumVertices);
+  pbbs::delete_array(NextActiveArray, totalNumVertices);
+  uintE* ret = pbbs::new_array<uintE>(totalNumVertices);
+  parallel_for(size_t i = 0; i < totalNumVertices; i++) {
+    ret[i] = (uintE)WidestPathVal[i];
+  }
+  pbbs::delete_array(WidestPathVal, totalNumVertices);
+  return ret;
+}
+
+template <class vertex>
 void Compute_Base(graph<vertex>& G, std::vector<long> vecQueries, commandLine P, bool should_profile) {
   size_t n = G.n;
   size_t edge_count = G.m;
