@@ -1281,7 +1281,7 @@ void scenario3_fixed(int argc, char* argv[]) {
     vector<double> delay_eval_time;
     cout << "=================\n";
     int start_from = P.getOptionLongValue("-start", 0);
-
+    cout << "start from: " << start_from << endl;
     int tmp_batch_size = bSize;
     if (bSize == 1) {
       cout << "Sequential eval query: \n";
@@ -1741,6 +1741,171 @@ void scenario2(int argc, char* argv[]) {
 
 }
 
+vector<vector<long>> my_comb(int N, int K, int max_size=10240)
+{
+    std::string bitmask(K, 1); // K leading 1's
+    bitmask.resize(N, 0); // N-K trailing 0's
+    
+    vector<vector<long>> ret;
+    // print integers and permute bitmask
+    do {
+        vector<long> tmp_sample;
+        for (int i = 0; i < N; ++i) // [0..N-1] integers
+        {
+            if (bitmask[i]) {
+                tmp_sample.push_back(i);
+                // std::cout << " " << i+1;
+            }
+        }
+        ret.push_back(tmp_sample);
+        if (ret.size() >= max_size) {   // break early
+            return ret;
+        }
+        // std::cout << std::endl;
+    } while (std::prev_permutation(bitmask.begin(), bitmask.end()));
+    return ret;
+}
+
+void test_1(int argc, char* argv[], vector<vector<long>> my_comb) {
+  commandLine P(argc,argv," [-s] <inFile>");
+  char* iFile = P.getArgument(0);
+  bool symmetric = P.getOptionValue("-s");
+  bool compressed = P.getOptionValue("-c");
+  bool binary = P.getOptionValue("-b");
+  bool mmap = P.getOptionValue("-m");
+  //cout << "mmap = " << mmap << endl;
+  long rounds = P.getOptionLongValue("-rounds",1);
+
+  string queryFileName = string(P.getOptionValue("-qf", ""));
+  int combination_max = P.getOptionLongValue("-max_combination", 256);
+  size_t bSize = P.getOptionLongValue("-batch", 4);
+  size_t n_high_deg = P.getOptionLongValue("-nhighdeg", 4);
+
+  cout << "graph file name: " << iFile << endl;
+  cout << "query file name: " << queryFileName << endl;
+
+  // Initialization and preprocessing
+  std::vector<long> userQueries; 
+  long start = -1;
+  char inFileName[300];
+  ifstream inFile;
+  sprintf(inFileName, queryFileName.c_str());
+  inFile.open(inFileName, ios::in);
+  while (inFile >> start) {
+    userQueries.push_back(start);
+  }
+  inFile.close();
+
+  // randomly shuffled each run
+  std::random_device rd;
+  auto rng = std::default_random_engine { rd() };
+  // auto rng = std::default_random_engine {};
+  std::shuffle(std::begin(userQueries), std::end(userQueries), rng);
+
+  cout << "number of random queries: " << userQueries.size() << endl;
+  
+  if (symmetric) {
+    cout << "not implemented\n";
+
+  } else {
+    // For directed graph...
+    cout << "asymmetric graph\n";
+    graph<asymmetricVertex> G =
+      readGraph<asymmetricVertex>(iFile,compressed,symmetric,binary,mmap); //asymmetric graph
+    cout << "n=" << G.n << " m=" << G.m << endl;
+
+    size_t n = G.n;
+    // ========================================
+    
+    // average (random) batch evaluation
+    for (int i = 0; i < userQueries.size(); i+=bSize) {
+      timer t_seq, t_batch, t_delay;
+      vector<long> tmp_batch;
+      for (int j = 0; j < bSize; j++) {
+        long tmp_query_id = userQueries[i+j];
+        tmp_batch.push_back(tmp_query_id);
+        cout << tmp_query_id << " ";
+      }
+      cout << endl;
+
+      // Sequential
+      t_seq.start();
+      for (int j = 0; j < tmp_batch.size(); j++) {
+        vector<long> tmp_single_query;
+        tmp_single_query.push_back(tmp_batch[j]);
+        Compute_Base(G,tmp_single_query,P);
+      }
+      t_seq.stop();
+
+      // Batching
+      t_batch.start();
+      Compute_Base(G,tmp_batch,P);
+      t_batch.stop();
+
+      double seq_time = t_seq.totalTime;
+      double batch_time = t_batch.totalTime / rounds;
+      t_seq.reportTotal("random sequential time");
+      t_batch.reportTotal("random batching evaluation time");
+
+      cout << "random batching speedup: " << seq_time / batch_time << endl;
+
+      // profiling the affinities
+      Compute_Base(G,tmp_batch,P,true);
+
+      cout << "=================\n";
+      
+    }
+    
+    cout << "Exhausive evaluation...\n";
+    
+    // Query evaluation: sequential, batching, delayed batching
+    vector<long> batchedQuery;
+    batchedQuery = userQueries;
+    cout << "=================\n";
+    for (int i = 0; i < my_comb.size(); i++) {
+      timer t_seq, t_batch, t_delay;
+      vector<long> tmp_batch;
+      cout << "Evaluating queries: ";
+      auto tmp_comb = my_comb[i];
+      for (int j = 0; j < bSize; j++) {
+        long tmp_query_id = batchedQuery[tmp_comb[j]];
+        tmp_batch.push_back(tmp_query_id);
+        cout << tmp_query_id << " ";
+      }
+      cout << endl;
+
+      // Sequential
+      t_seq.start();
+      for (int j = 0; j < tmp_batch.size(); j++) {
+        vector<long> tmp_single_query;
+        tmp_single_query.push_back(tmp_batch[j]);
+        Compute_Base(G,tmp_single_query,P);
+      }
+      t_seq.stop();
+
+      // Batching
+      t_batch.start();
+      Compute_Base(G,tmp_batch,P);
+      t_batch.stop();
+
+      double seq_time = t_seq.totalTime;
+      double batch_time = t_batch.totalTime / rounds;
+      t_seq.reportTotal("sequential time");
+      t_batch.reportTotal("batching evaluation time");
+
+      cout << "Batching speedup: " << seq_time / batch_time << endl;
+
+      // profiling the affinities
+      Compute_Base(G,tmp_batch,P,true);
+
+      cout << "=================\n";
+    }
+      
+    // }
+    G.del();
+  }
+}
+
 int parallel_main(int argc, char* argv[]) {
   commandLine P(argc,argv," [-s] <inFile>");
   string options = string(P.getOptionValue("-option", "scenario3"));
@@ -1761,6 +1926,12 @@ int parallel_main(int argc, char* argv[]) {
   if (options == "random_generation") {
     cout << "random query generation\n";
     QueryGeneration_Random(argc, argv);
+  }
+
+  if (options == "test_1") {
+    cout << "testing 16 queries exhaustively\n";
+    auto test_comb = my_comb(16, 2);
+    test_1(argc, argv, test_comb);
   }
     
 }
