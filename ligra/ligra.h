@@ -637,6 +637,258 @@ int QueryGeneration_Property(int argc, char* argv[]) {
   return 0;
 }
 
+template <class vertex>
+void bufferStreaming_with_arrival_time(graph<vertex>& G, std::vector<long> bufferedQueries, std::vector<double> arrivalTimes, uintE* distances, int bSize, commandLine P, bool should_profile=false) {
+  vector<double> latency_map;
+
+  double static_latency = 0.0;
+  // double start_time1 = update_timer.get_time();
+  double earlier_start1 = 0;
+  double new_est = 0;
+  // double new_est = arrivalTimes[0+bSize-1];
+  timer start_time1; start_time1.start();
+  for (int i = 0; i < bufferedQueries.size(); i=i+bSize) {
+    cout << "i: " << i << endl;
+    std::vector<long> tmpBatch;
+    double arrival_last_in_the_batch = arrivalTimes[i+bSize-1]; // last arrived in the batch
+    for (int j = 0; j < bSize; j++) {
+      tmpBatch.push_back(bufferedQueries[i+j]);
+      if (arrival_last_in_the_batch < new_est) {
+        // cout << "new_est - arrivalTimes[i+j]: " << new_est - arrivalTimes[i+j] << endl;
+        static_latency += new_est - arrivalTimes[i+j];
+      } else {
+        static_latency += arrival_last_in_the_batch - arrivalTimes[i+j];
+      }
+    }
+
+    // for delaying
+    vector<int> dist_to_high;
+    long total_delays = 0;
+    for (int j = 0; j < tmpBatch.size(); j++) {
+      cout << "q" << j << " to highest deg vtx: " << distances[tmpBatch[j]] << endl;
+      if (distances[tmpBatch[j]] != MAXLEVEL) {
+        dist_to_high.push_back(distances[tmpBatch[j]]);
+      } else {
+        dist_to_high.push_back(-1);
+      }
+    }
+    int max_dist_to_high = *max_element(dist_to_high.begin(), dist_to_high.end());
+
+    for (int j = 0; j < dist_to_high.size(); j++) {
+      if (dist_to_high[j] == -1) {
+        dist_to_high[j] = max_dist_to_high;
+      }
+    }
+
+    for (int j = 0; j < dist_to_high.size(); j++) {
+      dist_to_high[j] = max_dist_to_high - dist_to_high[j];
+      total_delays += dist_to_high[j];
+      cout << "No. " << j << " defer " << dist_to_high[j] << " iterations\n";
+    }
+    cout << "Total delays (delta): " << total_delays << endl;
+
+    timer t_t1;
+    t_t1.start();
+    Compute_Delay(G,tmpBatch,P,dist_to_high);
+    t_t1.stop();
+    double time1 = t_t1.totalTime;
+
+    // record latency for each query
+    for (int ii = 0; ii < bSize; ii++) {
+      latency_map.push_back(new_est+time1);
+    }
+
+    if (arrival_last_in_the_batch < new_est) {
+      new_est = time1 + new_est;
+    } else {
+      new_est = time1 + new_est + arrival_last_in_the_batch - new_est;
+    }
+    static_latency += (time1)*bSize;
+    
+    cout << "current latency: " << static_latency << endl;
+  }
+  start_time1.stop();
+  double query_time1 = start_time1.totalTime;
+  cout << "static batching version query time: " << query_time1 << endl;
+  cout << "Static total latency: " << static_latency << endl;
+
+  double check_sum = 0.0;
+  sort(latency_map.begin(), latency_map.end());
+  for (int ii = 0; ii < bufferedQueries.size(); ii++) {
+    cout << latency_map[ii] << endl;
+    check_sum += latency_map[ii];
+  }
+  cout << "check_sum: " << check_sum << endl;
+
+  // if (should_profile) {
+  //   for (int i = 0; i < bufferedQueries.size(); i=i+bSize) {
+  //     std::vector<long> tmpBatch;
+  //     for (int j = 0; j < bSize; j++) {
+  //       tmpBatch.push_back(bufferedQueries[i+j]);
+  //     }
+  //     Compute_Base(G,tmpBatch,P,true);
+  //   }
+  // }
+}
+
+void scenario_adaptive(int argc, char* argv[]) {
+  commandLine P(argc,argv," [-s] <inFile>");
+  char* iFile = P.getArgument(0);
+  bool symmetric = P.getOptionValue("-s");
+  bool compressed = P.getOptionValue("-c");
+  bool binary = P.getOptionValue("-b");
+  bool mmap = P.getOptionValue("-m");
+  long rounds = P.getOptionLongValue("-rounds",1);
+
+  string queryFileName = string(P.getOptionValue("-qf", ""));
+  string arrivalFileName = string(P.getOptionValue("-af", ""));
+  int combination_max = P.getOptionLongValue("-max_combination", 256);
+  size_t bSize = P.getOptionLongValue("-batch", 4);
+  size_t n_high_deg = P.getOptionLongValue("-nhighdeg", 4);
+
+  cout << "graph file name: " << iFile << endl;
+  cout << "query file name: " << queryFileName << endl;
+
+  // Initialization and preprocessing
+  std::vector<long> userQueries;
+  std::vector<double> arrivalTimes;
+  long start = -1;
+  char inFileName[300];
+  char inFileName2[300];
+  ifstream inFile;
+  sprintf(inFileName, queryFileName.c_str());
+  inFile.open(inFileName, ios::in);
+  while (inFile >> start) {
+    userQueries.push_back(start);
+  }
+  inFile.close();
+
+  ifstream inFile2;
+  sprintf(inFileName2, arrivalFileName.c_str());
+  inFile2.open(inFileName2, ios::in);
+  double aa, ff;
+  while (inFile2 >> aa >> ff) {
+    arrivalTimes.push_back(aa);
+  }
+  inFile2.close();
+
+  // randomly shuffled each run
+  std::random_device rd;
+  auto rng = std::default_random_engine { rd() };
+  // auto rng = std::default_random_engine {};
+  // std::shuffle(std::begin(userQueries), std::end(userQueries), rng);
+  cout << "number of random queries: " << userQueries.size() << endl;
+
+  int setSize = userQueries.size();
+  std::vector<long> testQuery[setSize];
+
+  if (symmetric) {
+    cout << "symmetric graph\n";
+    graph<symmetricVertex> G =
+      readGraph<symmetricVertex>(iFile,compressed,symmetric,binary,mmap); //symmetric graph
+    // for(int r=0;r<rounds;r++) {
+    cout << "n=" << G.n << " m=" << G.m << endl;
+    size_t n = G.n;
+    // ========================================
+    // finding the high degree vertices and evluating BFS on high degree vtxs
+    std::vector<std::pair<long, long>> vIDDegreePairs;
+    for (long i = 0; i < n; i++) {
+      long temp_degree =  G.V[i].getOutDegree();
+      if (temp_degree >= 50) {
+        vIDDegreePairs.push_back(std::make_pair(i, temp_degree));
+      }
+    }
+    std::sort(vIDDegreePairs.begin(), vIDDegreePairs.end(), sortByLargerSecondElement);
+    vector<long> highdegQ;
+    int high_deg_batch = n_high_deg;
+    for (int i = 0; i < high_deg_batch; i++) {
+      highdegQ.push_back(vIDDegreePairs[i].first);
+    }
+
+    uintE* distances_multiple;
+    distances_multiple = Compute_Eval(G,highdegQ,P);
+    uintE* distances = pbbs::new_array<uintE>(n);
+    parallel_for(size_t i = 0; i < n; i++) {
+      distances[i] = (uintE)MAXLEVEL;
+    }
+    parallel_for(size_t i = 0; i < n; i++) {
+      for (int j = 0; j < high_deg_batch; j++) {
+        if (distances_multiple[j+i*high_deg_batch] < distances[i]) {
+          distances[i] = distances_multiple[j+i*high_deg_batch];
+        }
+      }
+    }
+    // hop distributions of input queries.
+    std::map<long, long> user_hist;
+    for (long i = 0; i < userQueries.size(); i++) {
+      int dist = distances[userQueries[i]];
+      user_hist[dist]++;
+    }
+    for (const auto& x : user_hist) std::cout << x.first << " " << x.second <<"\n";
+
+    // start streaming.
+    // input: G, P, bufferedQueries, batch size
+    cout << "\non the unsorted buffer..\n";
+    bufferStreaming_with_arrival_time(G, userQueries, arrivalTimes, distances, bSize, P);
+    cout << endl;
+
+  } else {
+    // For directed graph...
+    cout << "asymmetric graph\n";
+    graph<asymmetricVertex> G =
+      readGraph<asymmetricVertex>(iFile,compressed,symmetric,binary,mmap); //asymmetric graph
+    cout << "n=" << G.n << " m=" << G.m << endl;
+    
+    size_t n = G.n;
+    // ========================================
+    // finding the high degree vertices and evluating BFS on high degree vtxs
+    std::vector<std::pair<long, long>> vIDDegreePairs;
+    for (long i = 0; i < n; i++) {
+      long temp_degree =  G.V[i].getOutDegree();
+      if (temp_degree >= 50) {
+        vIDDegreePairs.push_back(std::make_pair(i, temp_degree));
+      }
+    }
+    std::sort(vIDDegreePairs.begin(), vIDDegreePairs.end(), sortByLargerSecondElement);
+    vector<long> highdegQ;
+    int high_deg_batch = n_high_deg;
+    for (int i = 0; i < high_deg_batch; i++) {
+      highdegQ.push_back(vIDDegreePairs[i].first);
+    }
+
+    uintE* distances_multiple;
+    // On edge reversed graph...
+    G.transpose();
+    distances_multiple = Compute_Eval(G,highdegQ,P);  // to get hops
+    uintE* distances = pbbs::new_array<uintE>(n);
+    G.transpose();
+    parallel_for(size_t i = 0; i < n; i++) {
+      distances[i] = (uintE)MAXLEVEL;
+    }
+    parallel_for(size_t i = 0; i < n; i++) {
+      for (int j = 0; j < high_deg_batch; j++) {
+        if (distances_multiple[j+i*high_deg_batch] < distances[i]) {
+          distances[i] = distances_multiple[j+i*high_deg_batch];
+        }
+      }
+    }
+    // hop distributions of input queries.
+    std::map<long, long> user_hist;
+    for (long i = 0; i < userQueries.size(); i++) {
+      int dist = distances[userQueries[i]];
+      user_hist[dist]++;
+    }
+    for (const auto& x : user_hist) std::cout << x.first << " " << x.second <<"\n";
+
+    // Streaming...
+    cout << "\non the unsorted buffer..\n";
+    bufferStreaming_with_arrival_time(G, userQueries, arrivalTimes, distances, bSize, P);
+    cout << endl;
+
+  }
+
+}
+
 // for dealying
 void scenario3(int argc, char* argv[]) {
   commandLine P(argc,argv," [-s] <inFile>");
@@ -1921,6 +2173,11 @@ int parallel_main(int argc, char* argv[]) {
   if (options == "scenario2") {
     cout << "running scenraio 2\n";
     scenario2(argc, argv);  // reordering
+  }
+
+  if (options == "adaptive") {
+    cout << "adaptive batching...\n";
+    scenario_adaptive(argc, argv);
   }
     
   if (options == "random_generation") {
