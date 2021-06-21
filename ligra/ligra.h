@@ -1954,15 +1954,23 @@ void scenario2(int argc, char* argv[]) {
 
     // start streaming.
     // input: G, P, bufferedQueries, batch size
-    cout << "\nsequential evaluation..\n";
-    bufferStreaming(G, truncatedQueries, 1, P);
-    cout << "\non the unsorted buffer..\n";
-    bufferStreaming(G, truncatedQueries, bSize, P);
-    cout << endl;
-    cout << "\non the sorted buffer..\n";
-    bufferStreaming(G, sortedQueries, bSize, P);
-    // cout << "\non the property-based sorted buffer..\n";
-    // bufferStreaming(G, propertySortedQueries, bSize, P);
+    long selection = P.getOptionLongValue("-order",1);
+    if (selection == 1) {
+      cout << "\nsequential evaluation..\n";
+      bufferStreaming(G, truncatedQueries, 1, P);
+    }
+    if (selection == 2) {
+      cout << "\non the unsorted buffer..\n";
+      bufferStreaming(G, truncatedQueries, bSize, P, true);
+    }
+    if (selection == 3) {
+      cout << "\non the sorted buffer..\n";
+      bufferStreaming(G, sortedQueries, bSize, P, true);
+    }
+    if (selection == 4) {
+      cout << "\non the property-based sorted buffer..\n";
+      bufferStreaming(G, propertySortedQueries, bSize, P, true);
+    }
 
   } else {
     // For directed graph...
@@ -1979,13 +1987,23 @@ void scenario2(int argc, char* argv[]) {
     // propertySortedQueries = reorderingByProperty(G, truncatedQueries, n_high_deg, P);
     // start streaming.
     // input: G, P, bufferedQueries, batch size
-    cout << "\nsequential evaluation..\n";
-    bufferStreaming(G, truncatedQueries, 1, P);
-    cout << "\non the unsorted buffer..\n";
-    bufferStreaming(G, truncatedQueries, bSize, P, true);
-    cout << endl;
-    cout << "\non the sorted buffer..\n";
-    bufferStreaming(G, sortedQueries, bSize, P, true);
+    long selection = P.getOptionLongValue("-order",1);
+    if (selection == 1) {
+      cout << "\nsequential evaluation..\n";
+      bufferStreaming(G, truncatedQueries, 1, P);
+    }
+    if (selection == 2) {
+      cout << "\non the unsorted buffer..\n";
+      bufferStreaming(G, truncatedQueries, bSize, P, true);
+    }
+    if (selection == 3) {
+      cout << "\non the sorted buffer..\n";
+      bufferStreaming(G, sortedQueries, bSize, P, true);
+    }
+    if (selection == 4) {
+      cout << "\non the property-based sorted buffer..\n";
+      bufferStreaming(G, propertySortedQueries, bSize, P, true);
+    }
     // cout << "\non the property-based sorted buffer..\n";
     // bufferStreaming(G, propertySortedQueries, bSize, P, true);
 
