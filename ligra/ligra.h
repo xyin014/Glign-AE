@@ -1950,7 +1950,7 @@ void scenario2(int argc, char* argv[]) {
     vector<long> truncatedQueries;
     vector<long> propertySortedQueries;
     tie(truncatedQueries, sortedQueries) = streamingPreprocessing(G, userQueries, n_high_deg, combination_max, P);
-    // propertySortedQueries = reorderingByProperty(G, truncatedQueries, n_high_deg, P);
+    
 
     // start streaming.
     // input: G, P, bufferedQueries, batch size
@@ -1969,6 +1969,7 @@ void scenario2(int argc, char* argv[]) {
     }
     if (selection == 4) {
       cout << "\non the property-based sorted buffer..\n";
+      propertySortedQueries = reorderingByProperty(G, truncatedQueries, n_high_deg, P);
       bufferStreaming(G, propertySortedQueries, bSize, P, true);
     }
 
@@ -1984,7 +1985,7 @@ void scenario2(int argc, char* argv[]) {
     vector<long> truncatedQueries;
     vector<long> propertySortedQueries;
     tie(truncatedQueries, sortedQueries) = streamingPreprocessing(G, userQueries, n_high_deg, combination_max, P);
-    // propertySortedQueries = reorderingByProperty(G, truncatedQueries, n_high_deg, P);
+    
     // start streaming.
     // input: G, P, bufferedQueries, batch size
     long selection = P.getOptionLongValue("-order",1);
@@ -2002,6 +2003,7 @@ void scenario2(int argc, char* argv[]) {
     }
     if (selection == 4) {
       cout << "\non the property-based sorted buffer..\n";
+      propertySortedQueries = reorderingByProperty(G, truncatedQueries, n_high_deg, P);
       bufferStreaming(G, propertySortedQueries, bSize, P, true);
     }
     // cout << "\non the property-based sorted buffer..\n";
