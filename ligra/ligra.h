@@ -1694,60 +1694,60 @@ void scenario3_fixed(int argc, char* argv[]) {
   }
 }
 
-// template <class vertex>
-// vector<long> reorderingByProperty(graph<vertex>& G, vector<long> truncatedQueries, int n_high_deg, commandLine P) {
-//   vector<long> sortedQueries;
+template <class vertex>
+vector<long> reorderingByProperty(graph<vertex>& G, vector<long> truncatedQueries, int n_high_deg, commandLine P) {
+  vector<long> sortedQueries;
 
-//   size_t n = G.n;
-//   std::vector<std::pair<long, long>> vIDDegreePairs;
-//   for (long i = 0; i < n; i++) {
-//     long temp_degree =  G.V[i].getOutDegree();
-//     if (temp_degree >= 50) {
-//       vIDDegreePairs.push_back(std::make_pair(i, temp_degree));
-//     }
-//   }
-//   std::sort(vIDDegreePairs.begin(), vIDDegreePairs.end(), sortByLargerSecondElement);
-//   vector<long> highdegQ;
-//   int high_deg_batch = n_high_deg;
-//   for (int i = 0; i < high_deg_batch; i++) {
-//     highdegQ.push_back(vIDDegreePairs[i].first);
-//   }
-//   uintE* distances_multiple;
-//   G.transpose();
-//   cout << "sorting based on property values...\n";
-//   distances_multiple = Compute_Eval_Prop(G,highdegQ,P);
-//   uintE* distances = pbbs::new_array<uintE>(n);
-//   G.transpose();
-//   parallel_for(size_t i = 0; i < n; i++) {
-//     distances[i] = (uintE)MAXLEVEL;
-//   }
-//   parallel_for(size_t i = 0; i < n; i++) {
-//     for (int j = 0; j < high_deg_batch; j++) {
-//       if (distances_multiple[j+i*high_deg_batch] < distances[i]) {  // Note: only true for BFS and SSSP property.
-//         distances[i] = distances_multiple[j+i*high_deg_batch];
-//       }
-//     }
-//   }
+  size_t n = G.n;
+  std::vector<std::pair<long, long>> vIDDegreePairs;
+  for (long i = 0; i < n; i++) {
+    long temp_degree =  G.V[i].getOutDegree();
+    if (temp_degree >= 50) {
+      vIDDegreePairs.push_back(std::make_pair(i, temp_degree));
+    }
+  }
+  std::sort(vIDDegreePairs.begin(), vIDDegreePairs.end(), sortByLargerSecondElement);
+  vector<long> highdegQ;
+  int high_deg_batch = n_high_deg;
+  for (int i = 0; i < high_deg_batch; i++) {
+    highdegQ.push_back(vIDDegreePairs[i].first);
+  }
+  uintE* distances_multiple;
+  G.transpose();
+  cout << "sorting based on property values...\n";
+  distances_multiple = Compute_Eval_Prop(G,highdegQ,P);
+  uintE* distances = pbbs::new_array<uintE>(n);
+  G.transpose();
+  parallel_for(size_t i = 0; i < n; i++) {
+    distances[i] = (uintE)MAXLEVEL;
+  }
+  parallel_for(size_t i = 0; i < n; i++) {
+    for (int j = 0; j < high_deg_batch; j++) {
+      if (distances_multiple[j+i*high_deg_batch] < distances[i]) {  // Note: only true for BFS and SSSP property.
+        distances[i] = distances_multiple[j+i*high_deg_batch];
+      }
+    }
+  }
 
-//   std::vector<std::pair<size_t, long>> vtxValuePairs;
-//   for (long i = 0; i < truncatedQueries.size(); i++) {
-//     vtxValuePairs.push_back(std::make_pair(truncatedQueries[i], distances[truncatedQueries[i]]));
-//   }
+  std::vector<std::pair<size_t, long>> vtxValuePairs;
+  for (long i = 0; i < truncatedQueries.size(); i++) {
+    vtxValuePairs.push_back(std::make_pair(truncatedQueries[i], distances[truncatedQueries[i]]));
+  }
 
-//   std::sort(vtxValuePairs.begin(), vtxValuePairs.end(), sortByLargerSecondElement);
-//   for (int i = 0; i < vtxValuePairs.size(); i++) {
-//     long vID = vtxValuePairs[i].first;
-//     sortedQueries.push_back(vID);
-//     // cout << vID << " dist: " << degBatchPairs[i].second << endl;
-//   }
+  std::sort(vtxValuePairs.begin(), vtxValuePairs.end(), sortByLargerSecondElement);
+  for (int i = 0; i < vtxValuePairs.size(); i++) {
+    long vID = vtxValuePairs[i].first;
+    sortedQueries.push_back(vID);
+    // cout << vID << " dist: " << degBatchPairs[i].second << endl;
+  }
 
-//   cout << "\nsorted queries based on property values: \n";
-//   for (long i = 0; i < sortedQueries.size(); i++) {
-//     cout << sortedQueries[i] << ": " << distances[sortedQueries[i]] << endl;
-//   }
+  cout << "\nsorted queries based on property values: \n";
+  for (long i = 0; i < sortedQueries.size(); i++) {
+    cout << sortedQueries[i] << ": " << distances[sortedQueries[i]] << endl;
+  }
 
-//   return sortedQueries;
-// }
+  return sortedQueries;
+}
 
 template <class vertex>
 pair<vector<long>, vector<long>> streamingPreprocessing(graph<vertex>& G, vector<long> userQueries, int n_high_deg, int combination_max, commandLine P) {
