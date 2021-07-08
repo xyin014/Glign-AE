@@ -244,7 +244,7 @@ void Compute_Base(graph<vertex>& G, std::vector<long> vecQueries, commandLine P,
   for(long i = 0; i < batch_size; i++) {
     ShortestPathLen[(IdxType)batch_size * (IdxType)vecQueries[i] + (IdxType)i] = 0;
   }
-  parallel_for(size_t i = 0; i < batch_size; i++) {
+  for(size_t i = 0; i < batch_size; i++) {
     CurrActiveArray[(IdxType)vecQueries[i] * (IdxType)batch_size + (IdxType)i] = true;
   }
 
@@ -269,10 +269,10 @@ void Compute_Base(graph<vertex>& G, std::vector<long> vecQueries, commandLine P,
   size_t peak_activation = 0;
   int peak_iter = 0;
 
-  vector<long> frontier_iterations;
-  vector<long> overlapped_iterations;
-  vector<long> accumulated_overlapped_iterations;
-  vector<long> total_activated_iterations;
+  // vector<long> frontier_iterations;
+  // vector<long> overlapped_iterations;
+  // vector<long> accumulated_overlapped_iterations;
+  // vector<long> total_activated_iterations;
 
   while(!Frontier.isEmpty()){
     iteration++;
@@ -359,6 +359,13 @@ void Compute_Base(graph<vertex>& G, std::vector<long> vecQueries, commandLine P,
 
     Frontier.del();
     Frontier = output;
+
+    // Frontier.toDense();
+    // bool* new_d = Frontier.d;
+    // Frontier.d = nullptr;
+    // vertexSubset Frontier_new(n, new_d);
+    // Frontier.del();
+    // Frontier = Frontier_new;
 
     std::swap(CurrActiveArray, NextActiveArray);
     parallel_for(IdxType i = 0; i < totalNumVertices; i++) {
@@ -495,7 +502,7 @@ void Compute_Delay(graph<vertex>& G, std::vector<long> vecQueries, commandLine P
   for(long i = 0; i < batch_size; i++) {
     ShortestPathLen[(IdxType)batch_size * (IdxType)vecQueries[i] + (IdxType)i] = 0;
   }
-  parallel_for(size_t i = 0; i < batch_size; i++) {
+  for(size_t i = 0; i < batch_size; i++) {
     if (defer_vec[i] == 0) {
       CurrActiveArray[(IdxType)vecQueries[i] * (IdxType)batch_size + (IdxType)i] = true;
     }
@@ -522,10 +529,10 @@ void Compute_Delay(graph<vertex>& G, std::vector<long> vecQueries, commandLine P
   size_t peak_activation = 0;
   int peak_iter = 0;
 
-  vector<long> frontier_iterations;
-  vector<long> overlapped_iterations;
-  vector<long> accumulated_overlapped_iterations;
-  vector<long> total_activated_iterations;
+  // vector<long> frontier_iterations;
+  // vector<long> overlapped_iterations;
+  // vector<long> accumulated_overlapped_iterations;
+  // vector<long> total_activated_iterations;
 
   while(!Frontier.isEmpty()){
     iteration++;
@@ -621,6 +628,8 @@ void Compute_Delay(graph<vertex>& G, std::vector<long> vecQueries, commandLine P
     // parallel_for(size_t i = 0; i < n; i++) {
     //   new_d[i] = Frontier.d[i];
     // }
+
+    
     Frontier.toDense();
     bool* new_d = Frontier.d;
     Frontier.d = nullptr;

@@ -272,10 +272,10 @@ void Compute_Base(graph<vertex>& G, std::vector<long> vecQueries, commandLine P,
   size_t peak_activation = 0;
   int peak_iter = 0;
 
-  // vector<long> frontier_iterations;
-  // vector<long> overlapped_iterations;
-  // vector<long> accumulated_overlapped_iterations;
-  // vector<long> total_activated_iterations;
+  vector<long> frontier_iterations;
+  vector<long> overlapped_iterations;
+  vector<long> accumulated_overlapped_iterations;
+  vector<long> total_activated_iterations;
 
   while(!Frontier.isEmpty()){
     iteration++;
