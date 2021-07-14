@@ -3136,6 +3136,9 @@ int parallel_main(int argc, char* argv[]) {
     cout << "testing 16 queries exhaustively\n";
     size_t bSize = P.getOptionLongValue("-batch", 4);
     auto test_comb = my_comb(16, (int)bSize);
+    std::random_device rd;
+    std::mt19937 g(rd());
+    std::shuffle(test_comb.begin(), test_comb.end(), g);
     cout << "test combinations: " << test_comb.size() << endl;
     test_1(argc, argv, test_comb);
   }
