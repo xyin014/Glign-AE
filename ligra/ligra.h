@@ -2774,15 +2774,15 @@ void test_1(int argc, char* argv[], vector<vector<long>> my_comb) {
 
       // Batching
       t_batch.start();
-      Compute_Base(G,tmp_batch,P);
+      // Compute_Base(G,tmp_batch,P);
       t_batch.stop();
 
       double seq_time = t_seq.totalTime;
       double batch_time = t_batch.totalTime / rounds;
       t_seq.reportTotal("random sequential time");
-      t_batch.reportTotal("random batching evaluation time");
+      // t_batch.reportTotal("random batching evaluation time");
 
-      cout << "random batching speedup: " << seq_time / batch_time << endl;
+      // cout << "random batching speedup: " << seq_time / batch_time << endl;
 
       // // profiling the affinities
       // Compute_Base(G,tmp_batch,P,true);
@@ -2809,26 +2809,26 @@ void test_1(int argc, char* argv[], vector<vector<long>> my_comb) {
       }
       cout << endl;
 
-      // Sequential
-      t_seq.start();
-      for (int j = 0; j < tmp_batch.size(); j++) {
-        vector<long> tmp_single_query;
-        tmp_single_query.push_back(tmp_batch[j]);
-        Compute_Base(G,tmp_single_query,P);
-      }
-      t_seq.stop();
+      // // Sequential
+      // t_seq.start();
+      // for (int j = 0; j < tmp_batch.size(); j++) {
+      //   vector<long> tmp_single_query;
+      //   tmp_single_query.push_back(tmp_batch[j]);
+      //   Compute_Base(G,tmp_single_query,P);
+      // }
+      // t_seq.stop();
 
       // Batching
       t_batch.start();
       Compute_Base(G,tmp_batch,P);
       t_batch.stop();
 
-      double seq_time = t_seq.totalTime;
+      // double seq_time = t_seq.totalTime;
       double batch_time = t_batch.totalTime / rounds;
-      t_seq.reportTotal("sequential time");
+      // t_seq.reportTotal("sequential time");
       t_batch.reportTotal("batching evaluation time");
 
-      cout << "Batching speedup: " << seq_time / batch_time << endl;
+      // cout << "Batching speedup: " << seq_time / batch_time << endl;
 
       // // profiling the affinities
       // Compute_Base(G,tmp_batch,P,true);
@@ -2869,15 +2869,15 @@ void test_1(int argc, char* argv[], vector<vector<long>> my_comb) {
 
       // Batching
       t_batch.start();
-      Compute_Base(G,tmp_batch,P);
+      // Compute_Base(G,tmp_batch,P);
       t_batch.stop();
 
       double seq_time = t_seq.totalTime;
       double batch_time = t_batch.totalTime / rounds;
       t_seq.reportTotal("random sequential time");
-      t_batch.reportTotal("random batching evaluation time");
+      // t_batch.reportTotal("random batching evaluation time");
 
-      cout << "random batching speedup: " << seq_time / batch_time << endl;
+      // cout << "random batching speedup: " << seq_time / batch_time << endl;
 
       // // profiling the affinities
       // Compute_Base(G,tmp_batch,P,true);
@@ -2904,26 +2904,26 @@ void test_1(int argc, char* argv[], vector<vector<long>> my_comb) {
       }
       cout << endl;
 
-      // Sequential
-      t_seq.start();
-      for (int j = 0; j < tmp_batch.size(); j++) {
-        vector<long> tmp_single_query;
-        tmp_single_query.push_back(tmp_batch[j]);
-        Compute_Base(G,tmp_single_query,P);
-      }
-      t_seq.stop();
+      // // Sequential
+      // t_seq.start();
+      // for (int j = 0; j < tmp_batch.size(); j++) {
+      //   vector<long> tmp_single_query;
+      //   tmp_single_query.push_back(tmp_batch[j]);
+      //   Compute_Base(G,tmp_single_query,P);
+      // }
+      // t_seq.stop();
 
       // Batching
       t_batch.start();
       Compute_Base(G,tmp_batch,P);
       t_batch.stop();
 
-      double seq_time = t_seq.totalTime;
+      // double seq_time = t_seq.totalTime;
       double batch_time = t_batch.totalTime / rounds;
-      t_seq.reportTotal("sequential time");
+      // t_seq.reportTotal("sequential time");
       t_batch.reportTotal("batching evaluation time");
 
-      cout << "Batching speedup: " << seq_time / batch_time << endl;
+      // cout << "Batching speedup: " << seq_time / batch_time << endl;
 
       // // profiling the affinities
       // Compute_Base(G,tmp_batch,P,true);
