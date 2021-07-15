@@ -1318,20 +1318,20 @@ void scenario_adaptive_new(int argc, char* argv[]) {
       vector<long> tmp_batch;
       cout << "Evaluating queries: ";
       for (int j = 0; j < bSize; j++) {
-        long tmp_query_id = batchedQuery[j];
+        long tmp_query_id = batchedQuery[i+j];
         tmp_batch.push_back(tmp_query_id);
         cout << tmp_query_id << " ";
       }
       cout << endl;
 
       // Sequential
-      // t_seq.start();
-      // for (int j = 0; j < tmp_batch.size(); j++) {
-      //   vector<long> tmp_single_query;
-      //   tmp_single_query.push_back(tmp_batch[j]);
-      //   Compute_Base(G,tmp_single_query,P);
-      // }
-      // t_seq.stop();
+      t_seq.start();
+      for (int j = 0; j < tmp_batch.size(); j++) {
+        vector<long> tmp_single_query;
+        tmp_single_query.push_back(tmp_batch[j]);
+        Compute_Base(G,tmp_single_query,P);
+      }
+      t_seq.stop();
 
       // Delayed batching
       vector<int> dist_to_high;
@@ -1363,10 +1363,11 @@ void scenario_adaptive_new(int argc, char* argv[]) {
       Compute_Delay(G,tmp_batch,P,dist_to_high);
       t_delay.stop();
 
-      // double seq_time = t_seq.totalTime;
+      double seq_time = t_seq.totalTime;
       double delay_time = t_delay.totalTime;
       // t_seq.reportTotal("sequential time");
       t_delay.reportTotal("delayed batching evaluation time");
+      cout << "Delayed batching speedup: " << seq_time / delay_time << endl;
 
       cout << "=================\n";
     }
@@ -1441,13 +1442,13 @@ void scenario_adaptive_new(int argc, char* argv[]) {
       cout << endl;
 
       // // Sequential
-      // t_seq.start();
-      // for (int j = 0; j < tmp_batch.size(); j++) {
-      //   vector<long> tmp_single_query;
-      //   tmp_single_query.push_back(tmp_batch[j]);
-      //   Compute_Base(G,tmp_single_query,P);
-      // }
-      // t_seq.stop();
+      t_seq.start();
+      for (int j = 0; j < tmp_batch.size(); j++) {
+        vector<long> tmp_single_query;
+        tmp_single_query.push_back(tmp_batch[j]);
+        Compute_Base(G,tmp_single_query,P);
+      }
+      t_seq.stop();
 
       // Delayed batching
       vector<int> dist_to_high;
@@ -1482,10 +1483,11 @@ void scenario_adaptive_new(int argc, char* argv[]) {
       t_delay.stop();
 
 
-      // double seq_time = t_seq.totalTime;
-      double delay_time = t_delay.totalTime / rounds;
+      double seq_time = t_seq.totalTime;
+      double delay_time = t_delay.totalTime;
       // t_seq.reportTotal("sequential time");
       t_delay.reportTotal("delayed batching evaluation time");
+      cout << "Delayed batching speedup: " << seq_time / delay_time << endl;
 
       cout << "=================\n";
     }
