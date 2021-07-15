@@ -1229,7 +1229,274 @@ void scenario3(int argc, char* argv[]) {
   }
 }
 
-// for dealying
+void scenario_adaptive_new(int argc, char* argv[]) {
+  commandLine P(argc,argv," [-s] <inFile>");
+  char* iFile = P.getArgument(0);
+  bool symmetric = P.getOptionValue("-s");
+  bool compressed = P.getOptionValue("-c");
+  bool binary = P.getOptionValue("-b");
+  bool mmap = P.getOptionValue("-m");
+  //cout << "mmap = " << mmap << endl;
+  long rounds = P.getOptionLongValue("-rounds",1);
+  bool seq = P.getOptionValue("-i");
+
+  string queryFileName = string(P.getOptionValue("-qf", ""));
+  int combination_max = P.getOptionLongValue("-max_combination", 256);
+  size_t bSize = P.getOptionLongValue("-batch", 4);
+  size_t n_high_deg = P.getOptionLongValue("-nhighdeg", 4);
+
+  cout << "graph file name: " << iFile << endl;
+  cout << "query file name: " << queryFileName << endl;
+
+  // Initialization and preprocessing
+  std::vector<long> userQueries; 
+  long start = -1;
+  char inFileName[300];
+  ifstream inFile;
+  sprintf(inFileName, queryFileName.c_str());
+  inFile.open(inFileName, ios::in);
+  while (inFile >> start) {
+    userQueries.push_back(start);
+  }
+  inFile.close();
+
+  cout << "number of random queries: " << userQueries.size() << endl;
+  int batch_size = userQueries.size();
+  
+  if (symmetric) {
+    cout << "symmetric graph\n";
+    graph<symmetricVertex> G =
+      readGraph<symmetricVertex>(iFile,compressed,symmetric,binary,mmap); //symmetric graph
+    cout << "n=" << G.n << " m=" << G.m << endl;
+
+    size_t n = G.n;
+    // ========================================
+    // finding the high degree vertices and evluating BFS on high degree vtxs
+    std::vector<std::pair<long, long>> vIDDegreePairs;
+    for (long i = 0; i < n; i++) {
+      long temp_degree =  G.V[i].getOutDegree();
+      if (temp_degree >= 50) {
+        vIDDegreePairs.push_back(std::make_pair(i, temp_degree));
+      }
+    }
+    std::sort(vIDDegreePairs.begin(), vIDDegreePairs.end(), sortByLargerSecondElement);
+    vector<long> highdegQ;
+    int high_deg_batch = n_high_deg;
+    cout << "High Deg Vtxs: \n";
+    for (int i = 0; i < high_deg_batch; i++) {
+      highdegQ.push_back(vIDDegreePairs[i].first);
+      cout << vIDDegreePairs[i].first << ", degree: " << vIDDegreePairs[i].second << endl;
+    }
+
+    uintE* distances_multiple;
+    distances_multiple = Compute_Eval(G,highdegQ,P);
+    uintE* distances = pbbs::new_array<uintE>(n);
+    parallel_for(size_t i = 0; i < n; i++) {
+      distances[i] = (uintE)MAXLEVEL;
+    }
+    parallel_for(size_t i = 0; i < n; i++) {
+      for (int j = 0; j < high_deg_batch; j++) {
+        if (distances_multiple[j+i*high_deg_batch] < distances[i]) {
+          distances[i] = distances_multiple[j+i*high_deg_batch];
+        }
+      }
+    }
+    // hop distributions of input queries.
+    std::map<long, long> user_hist;
+    for (long i = 0; i < userQueries.size(); i++) {
+      int dist = distances[userQueries[i]];
+      user_hist[dist]++;
+    }
+    for (const auto& x : user_hist) std::cout << x.first << " " << x.second <<"\n";
+    
+    // Query evaluation: sequential, batching, delayed batching
+    vector<long> batchedQuery;
+    batchedQuery = userQueries;
+    cout << "=================\n";
+    for (int i = 0; i < batchedQuery.size(); i=i+bSize) {
+      timer t_seq, t_batch, t_delay;
+      vector<long> tmp_batch;
+      cout << "Evaluating queries: ";
+      for (int j = 0; j < bSize; j++) {
+        long tmp_query_id = batchedQuery[j];
+        tmp_batch.push_back(tmp_query_id);
+        cout << tmp_query_id << " ";
+      }
+      cout << endl;
+
+      // Sequential
+      // t_seq.start();
+      // for (int j = 0; j < tmp_batch.size(); j++) {
+      //   vector<long> tmp_single_query;
+      //   tmp_single_query.push_back(tmp_batch[j]);
+      //   Compute_Base(G,tmp_single_query,P);
+      // }
+      // t_seq.stop();
+
+      // Delayed batching
+      vector<int> dist_to_high;
+      long total_delays = 0;
+      for (int j = 0; j < tmp_batch.size(); j++) {
+        cout << "q" << j << " to highest deg vtx: " << distances[tmp_batch[j]] << endl;
+        if (distances[tmp_batch[j]] != MAXLEVEL) {
+          dist_to_high.push_back(distances[tmp_batch[j]]);
+        } else {
+          dist_to_high.push_back(-1);
+        }
+      }
+      int max_dist_to_high = *max_element(dist_to_high.begin(), dist_to_high.end());
+
+      for (int j = 0; j < dist_to_high.size(); j++) {
+        if (dist_to_high[j] == -1) {
+          dist_to_high[j] = max_dist_to_high;
+        }
+      }
+
+      for (int j = 0; j < dist_to_high.size(); j++) {
+        dist_to_high[j] = max_dist_to_high - dist_to_high[j];
+        total_delays += dist_to_high[j];
+        cout << "No. " << j << " defer " << dist_to_high[j] << " iterations\n";
+      }
+      cout << "Total delays (delta): " << total_delays << endl;
+
+      t_delay.start();
+      Compute_Delay(G,tmp_batch,P,dist_to_high);
+      t_delay.stop();
+
+      // double seq_time = t_seq.totalTime;
+      double delay_time = t_delay.totalTime;
+      // t_seq.reportTotal("sequential time");
+      t_delay.reportTotal("delayed batching evaluation time");
+
+      cout << "=================\n";
+    }
+    G.del();
+    pbbs::delete_array(distances, n);
+    pbbs::delete_array(distances_multiple, n*highdegQ.size());
+
+  } else {
+    // For directed graph...
+    cout << "asymmetric graph\n";
+    graph<asymmetricVertex> G =
+      readGraph<asymmetricVertex>(iFile,compressed,symmetric,binary,mmap); //asymmetric graph
+    cout << "n=" << G.n << " m=" << G.m << endl;
+
+    size_t n = G.n;
+    // ========================================
+    // finding the high degree vertices and evluating BFS on high degree vtxs
+    std::vector<std::pair<long, long>> vIDDegreePairs;
+    for (long i = 0; i < n; i++) {
+      long temp_degree =  G.V[i].getOutDegree();
+      if (temp_degree >= 50) {
+        vIDDegreePairs.push_back(std::make_pair(i, temp_degree));
+      }
+    }
+    std::sort(vIDDegreePairs.begin(), vIDDegreePairs.end(), sortByLargerSecondElement);
+    vector<long> highdegQ;
+    int high_deg_batch = n_high_deg;
+    cout << "High Deg Vtxs: \n";
+    for (int i = 0; i < high_deg_batch; i++) {
+      highdegQ.push_back(vIDDegreePairs[i].first);
+      cout << vIDDegreePairs[i].first << ", degree: " << vIDDegreePairs[i].second << endl;
+
+    }
+
+    uintE* distances_multiple;
+    // On edge reversed graph...
+    G.transpose();
+    distances_multiple = Compute_Eval(G,highdegQ,P);  // to get hops
+    uintE* distances = pbbs::new_array<uintE>(n);
+    G.transpose();
+    parallel_for(size_t i = 0; i < n; i++) {
+      distances[i] = (uintE)MAXLEVEL;
+    }
+    parallel_for(size_t i = 0; i < n; i++) {
+      for (int j = 0; j < high_deg_batch; j++) {
+        if (distances_multiple[j+i*high_deg_batch] < distances[i]) {
+          distances[i] = distances_multiple[j+i*high_deg_batch];
+        }
+      }
+    }
+    // hop distributions of input queries.
+    std::map<long, long> user_hist;
+    for (long i = 0; i < userQueries.size(); i++) {
+      int dist = distances[userQueries[i]];
+      user_hist[dist]++;
+    }
+    for (const auto& x : user_hist) std::cout << x.first << " " << x.second <<"\n";
+    
+    // Query evaluation: sequential, batching, delayed batching
+    vector<long> batchedQuery;
+    batchedQuery = userQueries;
+    cout << "=================\n";
+    for (int i = 0; i < batchedQuery.size(); i=i+bSize) {
+      timer t_seq, t_batch, t_delay;
+      vector<long> tmp_batch;
+      cout << "Evaluating queries: ";
+      for (int j = 0; j < bSize; j++) {
+        long tmp_query_id = batchedQuery[i+j];
+        tmp_batch.push_back(tmp_query_id);
+        cout << tmp_query_id << " ";
+      }
+      cout << endl;
+
+      // // Sequential
+      // t_seq.start();
+      // for (int j = 0; j < tmp_batch.size(); j++) {
+      //   vector<long> tmp_single_query;
+      //   tmp_single_query.push_back(tmp_batch[j]);
+      //   Compute_Base(G,tmp_single_query,P);
+      // }
+      // t_seq.stop();
+
+      // Delayed batching
+      vector<int> dist_to_high;
+      long total_delays = 0;
+      for (int j = 0; j < tmp_batch.size(); j++) {
+        cout << "q" << j << " to highest deg vtx: " << distances[tmp_batch[j]] << endl;
+        if (distances[tmp_batch[j]] != MAXLEVEL) {
+          dist_to_high.push_back(distances[tmp_batch[j]]);
+        } else {
+          dist_to_high.push_back(-1);
+        }
+      }
+      int max_dist_to_high = *max_element(dist_to_high.begin(), dist_to_high.end());
+
+      for (int j = 0; j < dist_to_high.size(); j++) {
+        if (dist_to_high[j] == -1) {
+          dist_to_high[j] = max_dist_to_high;
+        }
+      }
+
+      for (int j = 0; j < dist_to_high.size(); j++) {
+        dist_to_high[j] = max_dist_to_high - dist_to_high[j];
+        total_delays += dist_to_high[j];
+        cout << "No. " << j << " defer " << dist_to_high[j] << " iterations\n";
+      }
+      cout << "Total delays (delta): " << total_delays << endl;
+
+      t_delay.start();
+      for (int r = 0; r < rounds; r++) {
+        Compute_Delay(G,tmp_batch,P,dist_to_high);
+      }
+      t_delay.stop();
+
+
+      // double seq_time = t_seq.totalTime;
+      double delay_time = t_delay.totalTime / rounds;
+      // t_seq.reportTotal("sequential time");
+      t_delay.reportTotal("delayed batching evaluation time");
+
+      cout << "=================\n";
+    }
+      
+    // }
+    G.del();
+    pbbs::delete_array(distances, n);
+    pbbs::delete_array(distances_multiple, n*highdegQ.size());
+  }
+}
+
 void test_4(int argc, char* argv[]) {
   commandLine P(argc,argv," [-s] <inFile>");
   char* iFile = P.getArgument(0);
@@ -3125,6 +3392,11 @@ int parallel_main(int argc, char* argv[]) {
   if (options == "adaptive") {
     cout << "adaptive batching...\n";
     scenario_adaptive(argc, argv);
+  }
+
+  if (options == "adaptive_new") {
+    cout << "adaptive batching (new)...\n";
+    scenario_adaptive_new(argc, argv);
   }
     
   if (options == "random_generation") {
