@@ -1365,7 +1365,7 @@ void scenario_adaptive_new(int argc, char* argv[]) {
 
       double seq_time = t_seq.totalTime;
       double delay_time = t_delay.totalTime;
-      // t_seq.reportTotal("sequential time");
+      t_seq.reportTotal("sequential time");
       t_delay.reportTotal("delayed batching evaluation time");
       cout << "Delayed batching speedup: " << seq_time / delay_time << endl;
 
@@ -1485,7 +1485,7 @@ void scenario_adaptive_new(int argc, char* argv[]) {
 
       double seq_time = t_seq.totalTime;
       double delay_time = t_delay.totalTime;
-      // t_seq.reportTotal("sequential time");
+      t_seq.reportTotal("sequential time");
       t_delay.reportTotal("delayed batching evaluation time");
       cout << "Delayed batching speedup: " << seq_time / delay_time << endl;
 
