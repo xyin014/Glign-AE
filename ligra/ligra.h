@@ -1317,7 +1317,11 @@ void scenario_adaptive_new(int argc, char* argv[]) {
       timer t_seq, t_batch, t_delay;
       vector<long> tmp_batch;
       cout << "Evaluating queries: ";
-      for (int j = 0; j < bSize; j++) {
+      int tmp_size = bSize;
+      if (batchedQuery.size() < i+bSize) {
+        tmp_size = batchedQuery.size() - i;
+      }
+      for (int j = 0; j < tmp_size; j++) {
         long tmp_query_id = batchedQuery[i+j];
         tmp_batch.push_back(tmp_query_id);
         cout << tmp_query_id << " ";
@@ -1434,7 +1438,11 @@ void scenario_adaptive_new(int argc, char* argv[]) {
       timer t_seq, t_batch, t_delay;
       vector<long> tmp_batch;
       cout << "Evaluating queries: ";
-      for (int j = 0; j < bSize; j++) {
+      int tmp_size = bSize;
+      if (batchedQuery.size() < i+bSize) {
+        tmp_size = batchedQuery.size() - i;
+      }
+      for (int j = 0; j < tmp_size; j++) {
         long tmp_query_id = batchedQuery[i+j];
         tmp_batch.push_back(tmp_query_id);
         cout << tmp_query_id << " ";
