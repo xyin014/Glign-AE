@@ -3065,7 +3065,6 @@ void test_1(int argc, char* argv[], vector<vector<long>> my_comb) {
       // Compute_Base(G,tmp_batch,P,true);
 
       cout << "=================\n";
-      
     }
     
     cout << "Exhausive evaluation...\n";
@@ -3417,7 +3416,8 @@ int parallel_main(int argc, char* argv[]) {
   if (options == "test_1") {
     cout << "testing 16 queries exhaustively\n";
     size_t bSize = P.getOptionLongValue("-batch", 4);
-    auto test_comb = my_comb(16, (int)bSize);
+    int total = P.getOptionLongValue("-total", 32);
+    auto test_comb = my_comb(total, (int)bSize);
     std::random_device rd;
     std::mt19937 g(rd());
     std::shuffle(test_comb.begin(), test_comb.end(), g);
