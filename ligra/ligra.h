@@ -36,6 +36,7 @@
 #include <random>
 #include <queue>
 #include <map>
+#include <set>
 #include <algorithm>
 #include <unordered_set>
 #include <unordered_map>
@@ -2621,7 +2622,7 @@ pair<vector<long>, vector<long>> streamingPreprocessing(graph<vertex>& G, vector
 
   cout << "\ninput queries: \n";
   for (long i = 0; i < truncatedQueries.size(); i++) {
-    cout << truncatedQueries[i] << ": " << distances[truncatedQueries[i]] << endl;
+    // cout << truncatedQueries[i] << ": " << distances[truncatedQueries[i]] << endl;
     vtxHopPairs.push_back(std::make_pair(truncatedQueries[i], distances[truncatedQueries[i]]));
   }
 
@@ -2641,7 +2642,7 @@ pair<vector<long>, vector<long>> streamingPreprocessing(graph<vertex>& G, vector
 
   cout << "\nsorted queries: \n";
   for (long i = 0; i < sortedQueries.size(); i++) {
-    cout << sortedQueries[i] << ": " << distances[sortedQueries[i]] << endl;
+    // cout << sortedQueries[i] << ": " << distances[sortedQueries[i]] << endl;
   }
 
   return make_pair(truncatedQueries, sortedQueries);
@@ -2661,7 +2662,7 @@ void bufferStreaming(graph<vertex>& G, std::vector<long> bufferedQueries, int bS
     // double new_est = arrivalTimes[0+bSize-1];
     timer start_time1; start_time1.start();
     for (int i = 0; i < bufferedQueries.size(); i=i+bSize) {
-      cout << "i: " << i << endl;
+      // cout << "i: " << i << endl;
       std::vector<long> tmpBatch;
       double arrival_last_in_the_batch = arrivalTimes[i+bSize-1]; // last arrived in the batch
       for (int j = 0; j < bSize; j++) {
@@ -2692,7 +2693,7 @@ void bufferStreaming(graph<vertex>& G, std::vector<long> bufferedQueries, int bS
       }
       static_latency += (time1)*bSize;
       
-      cout << "current latency: " << static_latency << endl;
+      // cout << "current latency: " << static_latency << endl;
     }
     start_time1.stop();
     double query_time1 = start_time1.totalTime;
@@ -2702,7 +2703,7 @@ void bufferStreaming(graph<vertex>& G, std::vector<long> bufferedQueries, int bS
     double check_sum = 0.0;
     sort(latency_map.begin(), latency_map.end());
     for (int ii = 0; ii < bufferedQueries.size(); ii++) {
-      cout << latency_map[ii] << endl;
+      // cout << latency_map[ii] << endl;
       check_sum += latency_map[ii];
     }
     cout << "check_sum: " << check_sum << endl;
@@ -2829,6 +2830,262 @@ void scenario2(int argc, char* argv[]) {
     // cout << "\non the property-based sorted buffer..\n";
     // bufferStreaming(G, propertySortedQueries, bSize, P, true);
 
+  }
+
+}
+
+// for reordering
+void iBFS(int argc, char* argv[]) {
+  commandLine P(argc,argv," [-s] <inFile>");
+  char* iFile = P.getArgument(0);
+  bool symmetric = P.getOptionValue("-s");
+  bool compressed = P.getOptionValue("-c");
+  bool binary = P.getOptionValue("-b");
+  bool mmap = P.getOptionValue("-m");
+  //cout << "mmap = " << mmap << endl;
+  long rounds = P.getOptionLongValue("-rounds",1);
+
+  string queryFileName = string(P.getOptionValue("-qf", ""));
+  int combination_max = P.getOptionLongValue("-max_combination", 512);
+  size_t bSize = P.getOptionLongValue("-batch", 4);
+  size_t n_high_deg = P.getOptionLongValue("-nhighdeg", 4);
+
+  cout << "graph file name: " << iFile << endl;
+  cout << "query file name: " << queryFileName << endl;
+
+  // Initialization and preprocessing
+  std::vector<long> userQueries; 
+  long start = -1;
+  char inFileName[300];
+  ifstream inFile;
+  sprintf(inFileName, queryFileName.c_str());
+  inFile.open(inFileName, ios::in);
+  while (inFile >> start) {
+    userQueries.push_back(start);
+  }
+  inFile.close();
+  // randomly shuffled each run
+  std::random_device rd;
+  auto rng = std::default_random_engine { rd() };
+  // auto rng = std::default_random_engine {};
+  std::shuffle(std::begin(userQueries), std::end(userQueries), rng);
+  cout << "number of random queries: " << userQueries.size() << endl;
+
+  int setSize = userQueries.size();
+  std::vector<long> testQuery[setSize];
+
+  if (symmetric) {
+    // cout << "symmetric graph\n";
+    // graph<symmetricVertex> G =
+    //   readGraph<symmetricVertex>(iFile,compressed,symmetric,binary,mmap); //symmetric graph
+    // // for(int r=0;r<rounds;r++) {
+    // cout << "n=" << G.n << " m=" << G.m << endl;
+
+    // // Streaming...
+    // vector<long> sortedQueries;
+    // vector<long> truncatedQueries;
+    // vector<long> propertySortedQueries;
+    // tie(truncatedQueries, sortedQueries) = streamingPreprocessing(G, userQueries, n_high_deg, combination_max, P);
+    
+
+    // // start streaming.
+    // // input: G, P, bufferedQueries, batch size
+    // long selection = P.getOptionLongValue("-order",1);
+    // if (selection == 1) {
+    //   cout << "\nsequential evaluation..\n";
+    //   bufferStreaming(G, truncatedQueries, 1, P);
+    // }
+    // if (selection == 2) {
+    //   cout << "\non the unsorted buffer..\n";
+    //   bufferStreaming(G, truncatedQueries, bSize, P, true);
+    // }
+    // if (selection == 3) {
+    //   cout << "\non the sorted buffer..\n";
+    //   bufferStreaming(G, sortedQueries, bSize, P, true);
+    // }
+    // if (selection == 4) {
+    //   cout << "\non the property-based sorted buffer..\n";
+    //   propertySortedQueries = reorderingByProperty(G, truncatedQueries, n_high_deg, P);
+    //   bufferStreaming(G, propertySortedQueries, bSize, P, true);
+    // }
+
+  } else {
+    // For directed graph...
+    cout << "asymmetric graph\n";
+    graph<asymmetricVertex> G =
+      readGraph<asymmetricVertex>(iFile,compressed,symmetric,binary,mmap); //asymmetric graph
+    cout << "n=" << G.n << " m=" << G.m << endl;
+    
+    // Streaming...
+    vector<long> sortedQueries;
+    vector<long> truncatedQueries;
+    vector<long> propertySortedQueries;
+    tie(truncatedQueries, sortedQueries) = streamingPreprocessing(G, userQueries, n_high_deg, combination_max, P);
+    
+    // start streaming.
+    // input: G, P, bufferedQueries, batch size
+    long selection = P.getOptionLongValue("-order",1);
+    // if (selection == 1) {
+    //   cout << "\nsequential evaluation..\n";
+    //   bufferStreaming(G, truncatedQueries, 1, P);
+    // }
+    // if (selection == 2) {
+    //   cout << "\non the unsorted buffer..\n";
+    //   bufferStreaming(G, truncatedQueries, bSize, P, true);
+    // }
+    // if (selection == 3) {
+    //   cout << "\non the sorted buffer..\n";
+    //   bufferStreaming(G, sortedQueries, bSize, P, true);
+    // }
+    // if (selection == 4) {
+    //   cout << "\non the property-based sorted buffer..\n";
+    //   propertySortedQueries = reorderingByProperty(G, truncatedQueries, n_high_deg, P);
+    //   bufferStreaming(G, propertySortedQueries, bSize, P, true);
+    // }
+
+    // bufferStreaming(G, truncatedQueries, 1, P);
+    // bufferStreaming(G, truncatedQueries, bSize, P, false);
+    // bufferStreaming(G, sortedQueries, bSize, P, false);
+
+    // testing to see if queries share neighbors
+    cout << "\nTesting " << truncatedQueries.size() << " queries" << endl;
+    int p_seq[4] = {4, 16, 64, 128};
+    vector<long> ibfs_sorted;
+    set<long> selected_q;
+    int vtx_share_cnt[truncatedQueries.size()] = {}; // not needed
+    set<long> q_set;
+    for (long i = 0; i < truncatedQueries.size(); i++) {
+      q_set.insert(truncatedQueries[i]);
+    }
+
+    for (int s = 0; s < 4; s++) {
+      int p = p_seq[s];
+      for (long i = 0; i < truncatedQueries.size(); i++) {
+        vtx_share_cnt[i] = 0;
+        long _vtx = truncatedQueries[i];
+        intE* nghs = G.V[_vtx].getOutNeighbors();
+        long out_deg_i = G.V[_vtx].getOutDegree();
+        set<long> i_set;
+
+        for (long j = 0; j < out_deg_i; j++) {
+          long _ngh = nghs[j];
+          i_set.insert(_ngh);
+        }
+        for (long k = i; k < truncatedQueries.size(); k++) {
+          if (k == i) continue;
+          long _vtx_k = truncatedQueries[k];
+          intE* nghs_k = G.V[_vtx_k].getOutNeighbors();
+          long out_deg_k = G.V[_vtx_k].getOutDegree();
+          for (long j = 0; j < out_deg_k; j++) {
+            long _ngh = nghs_k[j];
+            if (i_set.find(_ngh) != i_set.end()) {
+              if (G.V[_ngh].getOutDegree() > 128) {
+                if (out_deg_i < p && out_deg_k < p) {
+                  // cout << i << " and " << k << " share at least one neighbor that q > 128, p < " << p << ", degs: " << out_deg_i << " " << out_deg_k << endl;
+                  if (selected_q.find(_vtx) == selected_q.end()) {
+                    cout << i << " share at least one neighbor that q > 128, p < " << p << ", degs: " << out_deg_i << endl;
+                    ibfs_sorted.push_back(_vtx);
+                    selected_q.insert(_vtx);
+                  }
+                  if (selected_q.find(_vtx_k) == selected_q.end()) {
+                    cout << k << " share at least one neighbor that q > 128, p < " << p << ", degs: " << out_deg_k << endl;
+                    ibfs_sorted.push_back(_vtx_k);
+                    selected_q.insert(_vtx_k);
+                  }
+                }
+                vtx_share_cnt[i]++;
+                break;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // ============================================
+    // // a different way of doing this.
+    // vector<long> ibfs_sorted;
+    // map<long, long> map_q;
+    // vector<pair<long, long>> vec_q;
+    // set<long> selected_q;
+    // set<long> q_set;
+    // for (long i = 0; i < truncatedQueries.size(); i++) {
+    //   q_set.insert(truncatedQueries[i]);
+    // }
+    // int q = 128;
+    // for (long i = 0; i < truncatedQueries.size(); i++) {
+    //   long _vtx = truncatedQueries[i];
+    //   intE* nghs = G.V[_vtx].getOutNeighbors();
+    //   long out_deg = G.V[_vtx].getOutDegree();
+    //   for (long j = 0; j < out_deg; j++) {
+    //     long _ngh = nghs[j];
+    //     long _ngh_degree = G.V[_ngh].getOutDegree();
+    //     if (_ngh_degree > q) {
+    //       map_q[_ngh]++;
+    //     }
+    //   }
+    // }
+    // for (auto elem : map_q) {
+    //   // cout << elem.first << " " << elem.second << endl;
+    //   vec_q.push_back(make_pair(elem.first, elem.second));
+    // }
+    // std::sort(vec_q.begin(), vec_q.end(), [](auto &left, auto &right) {
+    //     return left.second > right.second;
+    // });
+
+    // for (int s = 0; s < 4; s++) {
+    //   int p = p_seq[s];
+    //   for (auto elem : vec_q) {
+    //     // cout << elem.first << " " << elem.second << endl;
+    //     if (elem.second > 1) { // shared by more than 1 query. 
+    //       long _vtx = elem.first;
+    //       intE* in_nghs = G.V[_vtx].getInNeighbors();
+    //       long in_deg = G.V[_vtx].getInDegree();
+    //       for (long j = 0; j < in_deg; j++) {
+    //         long _ngh = in_nghs[j];
+    //         long out_deg = G.V[_ngh].getOutDegree();
+    //         if (q_set.find(_ngh) != q_set.end() && selected_q.find(_ngh) == selected_q.end() && out_deg < p) { // _ngh is a query source and deg < p
+    //           ibfs_sorted.push_back(_ngh);
+    //           selected_q.insert(_ngh);
+    //         }
+    //       }
+    //     }
+    //   }
+    // }    
+
+
+    cout << "iBFS sorted: " << ibfs_sorted.size() << endl;
+    
+    vector<long> rest_queries;
+    vector<long> rest_queries_original;
+    vector<long> dummy_queries;
+    vector<long> combined_sorted;
+    for (long i = 0; i < ibfs_sorted.size(); i++) {
+      combined_sorted.push_back(ibfs_sorted[i]);
+    }
+    for (long i = 0; i < truncatedQueries.size(); i++) {
+      if (selected_q.find(truncatedQueries[i]) == selected_q.end()) {
+        rest_queries_original.push_back(truncatedQueries[i]);
+      }
+    }
+    tie(dummy_queries, rest_queries) = streamingPreprocessing(G, rest_queries_original, n_high_deg, combination_max-ibfs_sorted.size(), P);
+    cout << rest_queries.size() << endl;
+    for (long i = 0; i < rest_queries.size(); i++) {
+      combined_sorted.push_back(rest_queries[i]);
+    }
+    cout << "combined sorted: " << combined_sorted.size() << endl;
+
+    for (long i = 0; i < truncatedQueries.size(); i++) {
+      if (selected_q.find(truncatedQueries[i]) == selected_q.end()) {
+        ibfs_sorted.push_back(truncatedQueries[i]);
+      }
+    }
+
+    bufferStreaming(G, truncatedQueries, 1, P);
+    bufferStreaming(G, truncatedQueries, bSize, P, false);
+    bufferStreaming(G, ibfs_sorted, bSize, P, false);
+    bufferStreaming(G, combined_sorted, bSize, P, false);
+    bufferStreaming(G, sortedQueries, bSize, P, false);
   }
 
 }
@@ -3396,6 +3653,11 @@ int parallel_main(int argc, char* argv[]) {
   if (options == "scenario2") {
     cout << "running scenraio 2\n";
     scenario2(argc, argv);  // reordering
+  }
+
+  if (options == "iBFS") {
+    cout << "running reordering based on out-degrees\n";
+    iBFS(argc, argv);  // reordering
   }
 
   if (options == "adaptive") {
