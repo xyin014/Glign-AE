@@ -487,7 +487,7 @@ uintE* Compute_Eval(graph<vertex>&, vector<long>, commandLine);
 template<class vertex>
 uintE* Compute_Eval_Prop(graph<vertex>&, vector<long>, commandLine);
 template<class vertex>
-void Compute_Base(graph<vertex>&, vector<long>, commandLine, bool should_profile=false);
+pair<size_t, size_t> Compute_Base(graph<vertex>&, vector<long>, commandLine, bool should_profile=false);
 template<class vertex>
 void Compute_Delay(graph<vertex>&, vector<long>, commandLine, vector<int>, bool should_profile=false);
 
@@ -2649,7 +2649,7 @@ pair<vector<long>, vector<long>> streamingPreprocessing(graph<vertex>& G, vector
 }
 
 template <class vertex>
-void bufferStreaming(graph<vertex>& G, std::vector<long> bufferedQueries, int bSize, commandLine P, bool should_profile=false) {
+vector<pair<size_t, size_t>> bufferStreaming(graph<vertex>& G, std::vector<long> bufferedQueries, int bSize, commandLine P, bool should_profile=false) {
   vector<double> latency_map;
     std::vector<double> arrivalTimes;
     for (int i = 0; i < bufferedQueries.size(); i++) {
@@ -2708,15 +2708,19 @@ void bufferStreaming(graph<vertex>& G, std::vector<long> bufferedQueries, int bS
     }
     cout << "check_sum: " << check_sum << endl;
 
+    vector<pair<size_t, size_t>> res;
     if (should_profile) {
       for (int i = 0; i < bufferedQueries.size(); i=i+bSize) {
         std::vector<long> tmpBatch;
         for (int j = 0; j < bSize; j++) {
           tmpBatch.push_back(bufferedQueries[i+j]);
         }
-        Compute_Base(G,tmpBatch,P,true);
+        pair<size_t, size_t> share_cnt = Compute_Base(G,tmpBatch,P,true);
+        res.push_back(share_cnt);
+        // cout << share_cnt.first << " " << share_cnt.second << endl;
       }
     }
+    return res;
 }
 
 // for reordering
@@ -2810,23 +2814,53 @@ void scenario2(int argc, char* argv[]) {
     // start streaming.
     // input: G, P, bufferedQueries, batch size
     long selection = P.getOptionLongValue("-order",1);
-    if (selection == 1) {
+    vector<pair<size_t,size_t>> share1;
+    vector<pair<size_t,size_t>> share_unsorted;
+    vector<pair<size_t,size_t>> share_sorted;
+
+    // if (selection == 1) {
       cout << "\nsequential evaluation..\n";
-      bufferStreaming(G, truncatedQueries, 1, P);
-    }
-    if (selection == 2) {
+      share1 = bufferStreaming(G, truncatedQueries, 1, P, true);
+    // }
+    // if (selection == 2) {
       cout << "\non the unsorted buffer..\n";
-      bufferStreaming(G, truncatedQueries, bSize, P, true);
-    }
-    if (selection == 3) {
+      share_unsorted = bufferStreaming(G, truncatedQueries, bSize, P, true);
+    // }
+    // if (selection == 3) {
       cout << "\non the sorted buffer..\n";
-      bufferStreaming(G, sortedQueries, bSize, P, true);
+      share_sorted = bufferStreaming(G, sortedQueries, bSize, P, true);
+    // }
+
+    vector<size_t> total_N;
+    for (int i = 0; i < combination_max; i+=bSize) {
+      size_t temp = 0;
+      for (int j = i; j < i+bSize; j++) {
+        temp += share1[j].first;
+      }
+      total_N.push_back(temp);
     }
-    if (selection == 4) {
-      cout << "\non the property-based sorted buffer..\n";
-      propertySortedQueries = reorderingByProperty(G, truncatedQueries, n_high_deg, P);
-      bufferStreaming(G, propertySortedQueries, bSize, P, true);
+
+    double share_ratio_unsorted = 0.0;
+    double share_ratio_sorted = 0.0;
+    cout << "size: " << total_N.size() << endl;
+    for (int i = 0; i < total_N.size(); i++) {
+      cout << i << endl;
+      size_t denominator = total_N[i];
+      size_t nominator_unsorted = share_unsorted[i].second;
+      size_t nominator_sorted = share_sorted[i].second;
+      // cout << nominator_unsorted << " " << nominator_sorted << " " << denominator << endl;
+      // cout << 1- 1.0*nominator_unsorted / denominator << " " << 1- 1.0*nominator_sorted / denominator << endl;
+      share_ratio_unsorted += (1 - 1.0*nominator_unsorted / denominator);
+      share_ratio_sorted += (1 - 1.0*nominator_sorted / denominator);
     }
+    cout << "unsorted average sharing ratio: " << share_ratio_unsorted/total_N.size() << endl;
+    cout << "sorted average sharing ratio: " << share_ratio_sorted/total_N.size() << endl;
+
+    // if (selection == 4) {
+    //   cout << "\non the property-based sorted buffer..\n";
+    //   propertySortedQueries = reorderingByProperty(G, truncatedQueries, n_high_deg, P);
+    //   bufferStreaming(G, propertySortedQueries, bSize, P, true);
+    // }
     // cout << "\non the property-based sorted buffer..\n";
     // bufferStreaming(G, propertySortedQueries, bSize, P, true);
 
