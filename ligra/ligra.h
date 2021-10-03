@@ -2054,7 +2054,84 @@ void test_7(int argc, char* argv[]) {
   cout << "query file name: " << queryFileName << endl;
   
   if (symmetric) {
-    cout << "symmetric graph: not implemented!\n";
+    cout << "symmetric graph\n";
+    graph<symmetricVertex> G =
+      readGraph<symmetricVertex>(iFile,compressed,symmetric,binary,mmap); //symmetric graph
+    // for(int r=0;r<rounds;r++) {
+    cout << "n=" << G.n << " m=" << G.m << endl;
+
+    size_t n = G.n;
+    // ========================================
+    // finding the high degree vertices and evluating BFS on high degree vtxs
+    std::vector<std::pair<long, long>> vIDDegreePairs;
+    for (long i = 0; i < n; i++) {
+      long temp_degree =  G.V[i].getOutDegree();
+      if (temp_degree >= 50) {
+        vIDDegreePairs.push_back(std::make_pair(i, temp_degree));
+      }
+    }
+    std::sort(vIDDegreePairs.begin(), vIDDegreePairs.end(), sortByLargerSecondElement);
+    vector<long> highdegQ;
+    int high_deg_batch = n_high_deg;
+    cout << "High Deg Vtxs: \n";
+    for (int i = 0; i < high_deg_batch; i++) {
+      highdegQ.push_back(vIDDegreePairs[i].first);
+      cout << vIDDegreePairs[i].first << ", degree: " << vIDDegreePairs[i].second << endl;
+    }
+
+    uintE* distances_multiple;
+    // On edge reversed graph...
+    distances_multiple = Compute_Eval(G,highdegQ,P);  // to get hops
+    uintE* distances_min = pbbs::new_array<uintE>(high_deg_batch);
+    uintE* distances_max = pbbs::new_array<uintE>(high_deg_batch);
+    uintE* distances_avg = pbbs::new_array<uintE>(high_deg_batch);
+
+    parallel_for(size_t i = 0; i < high_deg_batch; i++) {
+      distances_min[i] = (uintE)MAXLEVEL;
+      distances_max[i] = 0;
+      distances_avg[i] = 0;
+    }
+    parallel_for(size_t i = 0; i < high_deg_batch; i++) {
+      uintE vtx = highdegQ[i];
+      for (int j = 0; j < high_deg_batch; j++) {
+        if (i != j) {
+          if (distances_multiple[j+vtx*high_deg_batch] < distances_min[i]) {
+            distances_min[i] = distances_multiple[j+vtx*high_deg_batch];
+          }
+          if (distances_multiple[j+vtx*high_deg_batch] > distances_max[i]) {
+            distances_max[i] = distances_multiple[j+vtx*high_deg_batch];
+          }
+          distances_avg[i] += distances_multiple[j+vtx*high_deg_batch];
+        }
+      }
+    }
+    // hop distributions of input queries.
+    std::map<long, long> user_hist;
+    for (long i = 0; i < high_deg_batch; i++) {
+      int dist = distances_min[i];
+      user_hist[dist]++;
+    }
+    for (const auto& x : user_hist) std::cout << x.first << " " << x.second <<"\n";
+
+    int max_dist = 0;
+    int min_dist = 10000;
+    double avg_dist = 0;
+    for (long i = 0; i < high_deg_batch; i++) {
+      // cout << distances_max[i] << endl;
+      if (distances_min[i] < min_dist) min_dist = distances_min[i];
+      if (distances_max[i] > max_dist) max_dist = distances_max[i];
+      avg_dist += 1.0*distances_avg[i]/(high_deg_batch-1);
+    }
+    cout << "min_dist: " << min_dist << endl;
+    cout << "max_dist: " << max_dist << endl;
+    cout << "avg_dist: " << 1.0*avg_dist/high_deg_batch << endl;
+
+    // }
+    G.del();
+    pbbs::delete_array(distances_min, high_deg_batch);
+    pbbs::delete_array(distances_max, high_deg_batch);
+    pbbs::delete_array(distances_avg, high_deg_batch);
+    pbbs::delete_array(distances_multiple, n*highdegQ.size());
 
   } else {
     // For directed graph...
@@ -2080,7 +2157,6 @@ void test_7(int argc, char* argv[]) {
     for (int i = 0; i < high_deg_batch; i++) {
       highdegQ.push_back(vIDDegreePairs[i].first);
       cout << vIDDegreePairs[i].first << ", degree: " << vIDDegreePairs[i].second << endl;
-
     }
 
     uintE* distances_multiple;
