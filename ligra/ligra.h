@@ -482,12 +482,22 @@ inline bool cond_true (intT d) { return 1; }
 template<class vertex>
 void Compute(graph<vertex>&, commandLine);
 
+
+typedef uint32_t benchmarkType;
+const benchmarkType _empty = 0;
+const benchmarkType benchmark_sssp = 1;
+const benchmarkType benchmark_sswp = 2;
+const benchmarkType benchmark_ssnp = 4;
+const benchmarkType benchmark_bfs = 8;
+
 template<class vertex>
 uintE* Compute_Eval(graph<vertex>&, vector<long>, commandLine);
 template<class vertex>
 uintE* Compute_Eval_Prop(graph<vertex>&, vector<long>, commandLine);
 template<class vertex>
 void Compute_Base(graph<vertex>&, vector<long>, commandLine, bool should_profile=false);
+template<class vertex>
+void Compute_Heter_Base(graph<vertex>&, vector<pair<long, benchmarkType>>, commandLine, bool should_profile=false);
 template<class vertex>
 void Compute_Delay(graph<vertex>&, vector<long>, commandLine, vector<int>, bool should_profile=false);
 
@@ -2719,6 +2729,77 @@ void bufferStreaming(graph<vertex>& G, std::vector<long> bufferedQueries, int bS
     }
 }
 
+template <class vertex>
+void bufferStreamingTypes(graph<vertex>& G, std::vector<pair<long, benchmarkType>> bufferedQueries, int bSize, commandLine P, bool should_profile=false) {
+  vector<double> latency_map;
+    std::vector<double> arrivalTimes;
+    for (int i = 0; i < bufferedQueries.size(); i++) {
+      arrivalTimes.push_back(0.0);  // assuming all queries arrived at the same time.
+    } 
+    double static_latency = 0.0;
+    // double start_time1 = update_timer.get_time();
+    double earlier_start1 = 0;
+    double new_est = 0;
+    // double new_est = arrivalTimes[0+bSize-1];
+    timer start_time1; start_time1.start();
+    for (int i = 0; i < bufferedQueries.size(); i=i+bSize) {
+      // cout << "i: " << i << endl;
+      std::vector<pair<long, benchmarkType>> tmpBatch;
+      double arrival_last_in_the_batch = arrivalTimes[i+bSize-1]; // last arrived in the batch
+      for (int j = 0; j < bSize; j++) {
+        tmpBatch.push_back(bufferedQueries[i+j]);
+        if (arrival_last_in_the_batch < new_est) {
+          // cout << "new_est - arrivalTimes[i+j]: " << new_est - arrivalTimes[i+j] << endl;
+          static_latency += new_est - arrivalTimes[i+j];
+        } else {
+          static_latency += arrival_last_in_the_batch - arrivalTimes[i+j];
+        }
+      }
+
+      timer t_t1;
+      t_t1.start();
+      Compute_Heter_Base(G,tmpBatch,P);
+      t_t1.stop();
+      double time1 = t_t1.totalTime;
+
+      // record latency for each query
+      for (int ii = 0; ii < bSize; ii++) {
+        latency_map.push_back(new_est+time1);
+      }
+
+      if (arrival_last_in_the_batch < new_est) {
+        new_est = time1 + new_est;
+      } else {
+        new_est = time1 + new_est + arrival_last_in_the_batch - new_est;
+      }
+      static_latency += (time1)*bSize;
+      
+      // cout << "current latency: " << static_latency << endl;
+    }
+    start_time1.stop();
+    double query_time1 = start_time1.totalTime;
+    cout << "static batching version query time: " << query_time1 << endl;
+    cout << "Static total latency: " << static_latency << endl;
+
+    double check_sum = 0.0;
+    sort(latency_map.begin(), latency_map.end());
+    for (int ii = 0; ii < bufferedQueries.size(); ii++) {
+      // cout << latency_map[ii] << endl;
+      check_sum += latency_map[ii];
+    }
+    cout << "check_sum: " << check_sum << endl;
+
+    if (should_profile) {
+      for (int i = 0; i < bufferedQueries.size(); i=i+bSize) {
+        std::vector<pair<long, benchmarkType>> tmpBatch;
+        for (int j = 0; j < bSize; j++) {
+          tmpBatch.push_back(bufferedQueries[i+j]);
+        }
+        Compute_Heter_Base(G,tmpBatch,P,true);
+      }
+    }
+}
+
 // for reordering
 void scenario2(int argc, char* argv[]) {
   commandLine P(argc,argv," [-s] <inFile>");
@@ -2830,6 +2911,152 @@ void scenario2(int argc, char* argv[]) {
     // cout << "\non the property-based sorted buffer..\n";
     // bufferStreaming(G, propertySortedQueries, bSize, P, true);
 
+  }
+
+}
+
+// for reordering
+void heter_reordering(int argc, char* argv[]) {
+  commandLine P(argc,argv," [-s] <inFile>");
+  char* iFile = P.getArgument(0);
+  bool symmetric = P.getOptionValue("-s");
+  bool compressed = P.getOptionValue("-c");
+  bool binary = P.getOptionValue("-b");
+  bool mmap = P.getOptionValue("-m");
+  //cout << "mmap = " << mmap << endl;
+  long rounds = P.getOptionLongValue("-rounds",1);
+
+  string queryFileName = string(P.getOptionValue("-qf", ""));
+  int combination_max = P.getOptionLongValue("-max_combination", 256);
+  size_t bSize = P.getOptionLongValue("-batch", 4);
+  size_t n_high_deg = P.getOptionLongValue("-nhighdeg", 4);
+
+  cout << "graph file name: " << iFile << endl;
+  cout << "query file name: " << queryFileName << endl;
+
+  benchmarkType tmp_type;
+  benchmarkType qTypes[4] = {benchmark_sssp, benchmark_sswp, benchmark_ssnp, benchmark_bfs};
+  srand((unsigned)time(NULL));
+  // for (int t = 0; t < 32; t++) {
+  //   int rnd_idx = rand() % 4;
+  //   cout << rnd_idx << endl;
+  // }
+  
+  // Initialization and preprocessing
+  std::vector<long> userQueries; 
+  // vector<pair<long, benchmarkType>> userQueriesWithTypes;
+  map<long, benchmarkType> userQueriesWithTypes;
+  long start = -1;
+  char inFileName[300];
+  ifstream inFile;
+  sprintf(inFileName, queryFileName.c_str());
+  inFile.open(inFileName, ios::in);
+  while (inFile >> start) {
+    int rnd_idx = rand() % 4;
+    benchmarkType tmp_type = qTypes[rnd_idx];
+    // if (tmp_type & benchmark_sssp) {
+    //   cout << " sssp\n";
+    // }
+    // if (tmp_type & benchmark_sswp) {
+    //   cout << " sswp\n";
+    // }
+    // if (tmp_type & benchmark_ssnp) {
+    //   cout << " ssnp\n";
+    // }
+    // if (tmp_type & benchmark_bfs) {
+    //   cout << " bfs\n";
+    // }
+    userQueries.push_back(start);
+    userQueriesWithTypes[start] = tmp_type;
+  }
+  inFile.close();
+  // randomly shuffled each run
+  std::random_device rd;
+  auto rng = std::default_random_engine { rd() };
+  // auto rng = std::default_random_engine {};
+  std::shuffle(std::begin(userQueries), std::end(userQueries), rng);
+  cout << "number of random queries: " << userQueries.size() << endl;
+
+  int setSize = userQueries.size();
+  std::vector<long> testQuery[setSize];
+
+  if (symmetric) {
+    cout << "symmetric graph\n";
+    graph<symmetricVertex> G =
+      readGraph<symmetricVertex>(iFile,compressed,symmetric,binary,mmap); //symmetric graph
+    // for(int r=0;r<rounds;r++) {
+    cout << "n=" << G.n << " m=" << G.m << endl;
+
+    // Streaming...
+    vector<long> sortedQueries;
+    vector<long> truncatedQueries;
+    // vector<long> propertySortedQueries;
+    tie(truncatedQueries, sortedQueries) = streamingPreprocessing(G, userQueries, n_high_deg, combination_max, P);
+
+    vector<pair<long, benchmarkType>> sortedQueriesWithTypes;
+    vector<pair<long, benchmarkType>> truncatedQueriesWithTypes;
+    for (int i = 0; i < truncatedQueries.size(); i++) {
+      truncatedQueriesWithTypes.push_back(make_pair(truncatedQueries[i], userQueriesWithTypes[truncatedQueries[i]]));
+      sortedQueriesWithTypes.push_back(make_pair(sortedQueries[i], userQueriesWithTypes[sortedQueries[i]]));
+    }
+
+    // start streaming.
+    // input: G, P, bufferedQueries, batch size
+    long selection = P.getOptionLongValue("-order",1);
+    if (selection == 1) {
+      cout << "\nsequential evaluation..\n";
+      bufferStreamingTypes(G, truncatedQueriesWithTypes, 1, P);
+    }
+    if (selection == 2) {
+      cout << "\non the unsorted buffer..\n";
+      bufferStreamingTypes(G, truncatedQueriesWithTypes, bSize, P, true);
+    }
+    if (selection == 3) {
+      cout << "\non the sorted buffer..\n";
+      bufferStreamingTypes(G, sortedQueriesWithTypes, bSize, P, true);
+    }
+    // if (selection == 4) {
+    //   cout << "\non the property-based sorted buffer..\n";
+    //   propertySortedQueries = reorderingByProperty(G, truncatedQueries, n_high_deg, P);
+    //   bufferStreaming(G, propertySortedQueries, bSize, P, true);
+    // }
+
+  } else {
+    // For directed graph...
+    cout << "asymmetric graph\n";
+    graph<asymmetricVertex> G =
+      readGraph<asymmetricVertex>(iFile,compressed,symmetric,binary,mmap); //asymmetric graph
+    cout << "n=" << G.n << " m=" << G.m << endl;
+    
+    // Streaming...
+    vector<long> sortedQueries;
+    vector<long> truncatedQueries;
+    vector<long> propertySortedQueries;
+    tie(truncatedQueries, sortedQueries) = streamingPreprocessing(G, userQueries, n_high_deg, combination_max, P);
+
+    vector<pair<long, benchmarkType>> sortedQueriesWithTypes;
+    vector<pair<long, benchmarkType>> truncatedQueriesWithTypes;
+    for (int i = 0; i < truncatedQueries.size(); i++) {
+      truncatedQueriesWithTypes.push_back(make_pair(truncatedQueries[i], userQueriesWithTypes[truncatedQueries[i]]));
+      sortedQueriesWithTypes.push_back(make_pair(sortedQueries[i], userQueriesWithTypes[sortedQueries[i]]));
+    }
+    
+    // start streaming.
+    // input: G, P, bufferedQueries, batch size
+    long selection = P.getOptionLongValue("-order",1);
+    // if (selection == 1) {
+      cout << "\nsequential evaluation..\n";
+      bufferStreamingTypes(G, truncatedQueriesWithTypes, 1, P);
+    // }
+    // if (selection == 2) {
+      cout << "\non the unsorted buffer..\n";
+      bufferStreamingTypes(G, truncatedQueriesWithTypes, bSize, P, true);
+    // }
+    // if (selection == 3) {
+      cout << "\non the sorted buffer..\n";
+      bufferStreamingTypes(G, sortedQueriesWithTypes, bSize, P, true);
+    // }
+    
   }
 
 }
@@ -3658,6 +3885,11 @@ int parallel_main(int argc, char* argv[]) {
   if (options == "iBFS") {
     cout << "running reordering based on out-degrees\n";
     iBFS(argc, argv);  // reordering
+  }
+
+  if (options == "heter_reordering") {
+    cout << "running heterogeneous queries with reordering\n";
+    heter_reordering(argc, argv);  // reordering
   }
 
   if (options == "adaptive") {
