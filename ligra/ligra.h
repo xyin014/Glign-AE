@@ -2034,6 +2034,113 @@ void test_6(int argc, char* argv[]) {
   }
 }
 
+// Study high degree vertices
+void test_7(int argc, char* argv[]) {
+  commandLine P(argc,argv," [-s] <inFile>");
+  char* iFile = P.getArgument(0);
+  bool symmetric = P.getOptionValue("-s");
+  bool compressed = P.getOptionValue("-c");
+  bool binary = P.getOptionValue("-b");
+  bool mmap = P.getOptionValue("-m");
+  //cout << "mmap = " << mmap << endl;
+  long rounds = P.getOptionLongValue("-rounds",1);
+
+  string queryFileName = string(P.getOptionValue("-qf", ""));
+  int combination_max = P.getOptionLongValue("-max_combination", 256);
+  size_t bSize = P.getOptionLongValue("-batch", 4);
+  size_t n_high_deg = P.getOptionLongValue("-nhighdeg", 16);
+
+  cout << "graph file name: " << iFile << endl;
+  cout << "query file name: " << queryFileName << endl;
+  
+  if (symmetric) {
+    cout << "symmetric graph: not implemented!\n";
+
+  } else {
+    // For directed graph...
+    cout << "asymmetric graph\n";
+    graph<asymmetricVertex> G =
+      readGraph<asymmetricVertex>(iFile,compressed,symmetric,binary,mmap); //asymmetric graph
+    cout << "n=" << G.n << " m=" << G.m << endl;
+
+    size_t n = G.n;
+    // ========================================
+    // finding the high degree vertices and evluating BFS on high degree vtxs
+    std::vector<std::pair<long, long>> vIDDegreePairs;
+    for (long i = 0; i < n; i++) {
+      long temp_degree =  G.V[i].getOutDegree();
+      if (temp_degree >= 50) {
+        vIDDegreePairs.push_back(std::make_pair(i, temp_degree));
+      }
+    }
+    std::sort(vIDDegreePairs.begin(), vIDDegreePairs.end(), sortByLargerSecondElement);
+    vector<long> highdegQ;
+    int high_deg_batch = n_high_deg;
+    cout << "High Deg Vtxs: \n";
+    for (int i = 0; i < high_deg_batch; i++) {
+      highdegQ.push_back(vIDDegreePairs[i].first);
+      cout << vIDDegreePairs[i].first << ", degree: " << vIDDegreePairs[i].second << endl;
+
+    }
+
+    uintE* distances_multiple;
+    // On edge reversed graph...
+    G.transpose();
+    distances_multiple = Compute_Eval(G,highdegQ,P);  // to get hops
+    G.transpose();
+    uintE* distances_min = pbbs::new_array<uintE>(high_deg_batch);
+    uintE* distances_max = pbbs::new_array<uintE>(high_deg_batch);
+    uintE* distances_avg = pbbs::new_array<uintE>(high_deg_batch);
+
+    parallel_for(size_t i = 0; i < high_deg_batch; i++) {
+      distances_min[i] = (uintE)MAXLEVEL;
+      distances_max[i] = 0;
+      distances_avg[i] = 0;
+    }
+    parallel_for(size_t i = 0; i < high_deg_batch; i++) {
+      uintE vtx = highdegQ[i];
+      for (int j = 0; j < high_deg_batch; j++) {
+        if (i != j) {
+          if (distances_multiple[j+vtx*high_deg_batch] < distances_min[i]) {
+            distances_min[i] = distances_multiple[j+vtx*high_deg_batch];
+          }
+          if (distances_multiple[j+vtx*high_deg_batch] > distances_max[i]) {
+            distances_max[i] = distances_multiple[j+vtx*high_deg_batch];
+          }
+          distances_avg[i] += distances_multiple[j+vtx*high_deg_batch];
+        }
+      }
+    }
+    // hop distributions of input queries.
+    std::map<long, long> user_hist;
+    for (long i = 0; i < high_deg_batch; i++) {
+      int dist = distances_min[i];
+      user_hist[dist]++;
+    }
+    for (const auto& x : user_hist) std::cout << x.first << " " << x.second <<"\n";
+
+    int max_dist = 0;
+    int min_dist = 10000;
+    double avg_dist = 0;
+    for (long i = 0; i < high_deg_batch; i++) {
+      // cout << distances_max[i] << endl;
+      if (distances_min[i] < min_dist) min_dist = distances_min[i];
+      if (distances_max[i] > max_dist) max_dist = distances_max[i];
+      avg_dist += 1.0*distances_avg[i]/(high_deg_batch-1);
+    }
+    cout << "min_dist: " << min_dist << endl;
+    cout << "max_dist: " << max_dist << endl;
+    cout << "avg_dist: " << 1.0*avg_dist/high_deg_batch << endl;
+
+    // }
+    G.del();
+    pbbs::delete_array(distances_min, high_deg_batch);
+    pbbs::delete_array(distances_max, high_deg_batch);
+    pbbs::delete_array(distances_avg, high_deg_batch);
+    pbbs::delete_array(distances_multiple, n*highdegQ.size());
+  }
+}
+
 // for dealying
 void scenario3_fixed(int argc, char* argv[]) {
   commandLine P(argc,argv," [-s] <inFile>");
@@ -2674,10 +2781,11 @@ vector<pair<size_t, size_t>> bufferStreaming(graph<vertex>& G, std::vector<long>
           static_latency += arrival_last_in_the_batch - arrivalTimes[i+j];
         }
       }
-
+      
       timer t_t1;
       t_t1.start();
-      Compute_Base(G,tmpBatch,P);
+      if (bSize != 1)
+        Compute_Base(G,tmpBatch,P);
       t_t1.stop();
       double time1 = t_t1.totalTime;
 
@@ -2710,6 +2818,8 @@ vector<pair<size_t, size_t>> bufferStreaming(graph<vertex>& G, std::vector<long>
 
     vector<pair<size_t, size_t>> res;
     if (should_profile) {
+      timer t_t1;
+      t_t1.start();
       for (int i = 0; i < bufferedQueries.size(); i=i+bSize) {
         std::vector<long> tmpBatch;
         for (int j = 0; j < bSize; j++) {
@@ -2719,6 +2829,9 @@ vector<pair<size_t, size_t>> bufferStreaming(graph<vertex>& G, std::vector<long>
         res.push_back(share_cnt);
         // cout << share_cnt.first << " " << share_cnt.second << endl;
       }
+      t_t1.stop();
+      double time1 = t_t1.totalTime;
+      cout << "Profiling time: " << time1 << endl;
     }
     return res;
 }
@@ -2846,10 +2959,10 @@ void scenario2(int argc, char* argv[]) {
     for (int i = 0; i < total_N.size(); i++) {
       cout << i << endl;
       size_t denominator = total_N[i];
-      size_t nominator_unsorted = share_unsorted[i].second;
-      size_t nominator_sorted = share_sorted[i].second;
-      // cout << nominator_unsorted << " " << nominator_sorted << " " << denominator << endl;
-      // cout << 1- 1.0*nominator_unsorted / denominator << " " << 1- 1.0*nominator_sorted / denominator << endl;
+      size_t nominator_unsorted = share_unsorted[i].first;
+      size_t nominator_sorted = share_sorted[i].first;
+      cout << nominator_unsorted << " " << nominator_sorted << " " << denominator << endl;
+      cout << 1- 1.0*nominator_unsorted / denominator << " " << 1- 1.0*nominator_sorted / denominator << endl;
       share_ratio_unsorted += (1 - 1.0*nominator_unsorted / denominator);
       share_ratio_sorted += (1 - 1.0*nominator_sorted / denominator);
     }
@@ -3744,6 +3857,11 @@ int parallel_main(int argc, char* argv[]) {
   if (options == "test_6") {
     cout << "testing hops between two queries and hops to the high degree\n";
     test_6(argc, argv);
+  }
+
+  if (options == "test_7") {
+    cout << "testing distances among high degree vertices\n";
+    test_7(argc, argv);
   }
     
 }
