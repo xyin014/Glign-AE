@@ -72,6 +72,52 @@ struct DJ_F {
   inline bool cond (uintE d) { return cond_true(d); } 
 };
 
+struct DJ_SKIP_F {
+  intE* ShortestPathLen;
+  bool* CurrActiveArray;
+  bool* NextActiveArray;
+  long BatchSize;
+
+  DJ_SKIP_F(intE* _ShortestPathLen, bool* _CurrActiveArray, bool* _NextActiveArray, long _BatchSize) : 
+    ShortestPathLen(_ShortestPathLen), CurrActiveArray(_CurrActiveArray), NextActiveArray(_NextActiveArray), BatchSize(_BatchSize) {}
+  
+  inline bool update (uintE s, uintE d, intE edgeLen) { //Update
+    bool ret = false;
+    IdxType s_begin = s * BatchSize;
+    IdxType d_begin = d * BatchSize;
+
+    for (long j = 0; j < BatchSize; j++) {
+      // if (CurrActiveArray[s_begin + j]) {
+        intE newValue = ShortestPathLen[s_begin + j] + edgeLen;
+        if (ShortestPathLen[d_begin + j] > newValue) {
+          // Visited[d_begin + j] = true;
+          ShortestPathLen[d_begin + j] = newValue;
+          // NextActiveArray[d_begin + j] = true;
+          ret = true;
+        }
+      // }
+    }
+    return ret;
+  }
+  
+  inline bool updateAtomic (uintE s, uintE d, intE edgeLen){ //atomic version of Update
+    bool ret = false;
+    IdxType s_begin = s * BatchSize;
+    IdxType d_begin = d * BatchSize;
+    for (long j = 0; j < BatchSize; j++) {
+      // if (CurrActiveArray[s_begin + j]) {
+        intE newValue = ShortestPathLen[s_begin + j] + edgeLen;
+        if (writeMin(&ShortestPathLen[d_begin + j], newValue) ) {
+          ret = true;
+        }
+      // }
+    }
+    return ret;
+  }
+  //cond function checks if vertex has been visited yet
+  inline bool cond (uintE d) { return cond_true(d); } 
+};
+
 struct BFSLV_F {
   uintE* Levels;
   bool* CurrActiveArray;
@@ -281,78 +327,7 @@ pair<size_t, size_t> Compute_Base(graph<vertex>& G, std::vector<long> vecQueries
 
     // profiling
     if (should_profile) {
-      if (Frontier.size() > peak_activation) {
-        peak_activation = Frontier.size();
-        peak_iter = iteration;
-      }
-
-      // bool* overlap_set = pbbs::new_array<bool>(n); // activated for all queries
-      // bool* overlap_set_one = pbbs::new_array<bool>(n); // only activated for at least half of queries
-      bool* overlap_set_only = pbbs::new_array<bool>(n);
-      parallel_for(size_t i = 0; i < n; i++) {
-        // overlap_set[i] = true;
-        // overlap_set_one[i] = false;
-        overlap_set_only[i] = false;
-      }
-      parallel_for(size_t index = 0; index < n; index++) {
-        int tmp_flag = 0;
-        for (int i = 0; i < batch_size; i++) {
-          // if the vertex is activated for all queries...
-          // overlap_set[index] = overlap_set[index] && CurrActiveArray[index * batch_size + i];
-          if (CurrActiveArray[index * batch_size + i]) {
-            tmp_flag++;
-          }
-        }
-        // activated for at least half of the queries.
-        // if (tmp_flag >= batch_size/2) {
-        //   overlap_set_one[index] = true;
-        // }
-        // only one is activated.
-        if (tmp_flag == 1) {
-          overlap_set_only[index] = true;
-        }
-        // // the summation
-        // for (int i = 0; i < batch_size; i++) {
-        //   if (tmp_flag == i+1) {
-        //     pbbs::fetch_and_add(&overlaps[i], 1);
-        //   }
-        // }
-      } // end parallel_for
-      // size_t overlap_size = 0;
-      // size_t overlap_size_one = 0;
-      size_t overlap_size_only = 0;
-      parallel_for(size_t j = 0; j < n; j++) {
-        // if (overlap_set[j]) {
-        //   pbbs::fetch_and_add(&overlap_size, 1);
-        // }
-        // if (overlap_set_one[j]) {
-        //   pbbs::fetch_and_add(&overlap_size_one, 1);
-        // }
-        if (overlap_set_only[j]) {
-          pbbs::fetch_and_add(&overlap_size_only, 1);
-        }
-      } // end parallel_for
-      // accumulated_overlap += overlap_size;
-      // accumulated_overlap_one += overlap_size_one;
-      // accumulated_overlap_only += overlap_size_only;
-      // double total_overlap_score = 0.0;
-      // for (int i = 0; i < batch_size; i++) {
-      //   total_overlap_score += (i+1) * overlaps[i] * 1.0;
-      // }
-      // total_overlap_score = total_overlap_score / totalActivated / batch_size;
-      // overlap_scores.push_back(total_overlap_score);
-
-      // affinity_tracking.push_back(make_pair(Frontier.size(), 1.0 * overlap_size / Frontier.size()));
-      // affinity_tracking_one.push_back(make_pair(Frontier.size(), 1.0 * overlap_size_one / Frontier.size()));
-      // affinity_tracking_only.push_back(make_pair(Frontier.size(), 1.0 * overlap_size_only / Frontier.size()));
-      // pbbs::delete_array(overlap_set, n);
-      // pbbs::delete_array(overlap_set_one, n);
-      pbbs::delete_array(overlap_set_only, n);
-      totalNoOverlap += overlap_size_only;
-      // frontier_iterations.push_back(Frontier.size());
-      // overlapped_iterations.push_back(overlap_size);
-      // accumulated_overlapped_iterations.push_back(accumulated_overlap);
-      // total_activated_iterations.push_back(totalActivated);
+      
     }
 
     // mode: no_dense, remove_duplicates (for batch size > 1)
@@ -372,6 +347,290 @@ pair<size_t, size_t> Compute_Base(graph<vertex>& G, std::vector<long> vecQueries
     parallel_for(IdxType i = 0; i < totalNumVertices; i++) {
       NextActiveArray[i] = false;
     }
+  }
+
+  // profiling
+  if (should_profile) {
+    
+  }
+
+#ifdef OUTPUT 
+  for (int i = 0; i < batch_size; i++) {
+    long start = vecQueries[i];
+    char outFileName[300];
+    sprintf(outFileName, "SSSP_base_output_src%ld.%ld.%ld.out", start, edge_count, batch_size);
+    FILE *fp;
+    fp = fopen(outFileName, "w");
+    for (long j = 0; j < n; j++)
+      fprintf(fp, "%ld %d\n", j, ShortestPathLen[j * batch_size + i]);
+    fclose(fp);
+  }
+#endif
+
+  Frontier.del();
+  pbbs::delete_array(ShortestPathLen, totalNumVertices);
+  pbbs::delete_array(CurrActiveArray, totalNumVertices);
+  pbbs::delete_array(NextActiveArray, totalNumVertices);
+  pbbs::delete_array(overlaps, batch_size);
+  return make_pair(totalActivated, totalNoOverlap);
+}
+
+template <class vertex>
+pair<size_t, size_t> Compute_Base_Dynamic(graph<vertex>& G, std::vector<long> vecQueries, queue<long>& queryQueue, commandLine P, bool should_profile) {
+  size_t n = G.n;
+  size_t edge_count = G.m;
+  long batch_size = vecQueries.size();
+  IdxType totalNumVertices = (IdxType)n * (IdxType)batch_size;
+  intE* ShortestPathLen = pbbs::new_array<intE>(totalNumVertices);
+  bool* CurrActiveArray = pbbs::new_array<bool>(totalNumVertices);
+  bool* NextActiveArray = pbbs::new_array<bool>(totalNumVertices);
+  bool* frontier = pbbs::new_array<bool>(n);
+  parallel_for(size_t i = 0; i < n; i++) {
+    frontier[i] = false;
+  }
+  for(long i = 0; i < batch_size; i++) {
+    frontier[vecQueries[i]] = true;
+  }
+  parallel_for(IdxType i = 0; i < totalNumVertices; i++) {
+    ShortestPathLen[i] = (intE)MAXPATH;
+    CurrActiveArray[i] = false;
+    NextActiveArray[i] = false;
+  }
+  for(long i = 0; i < batch_size; i++) {
+    ShortestPathLen[(IdxType)batch_size * (IdxType)vecQueries[i] + (IdxType)i] = 0;
+  }
+  for(size_t i = 0; i < batch_size; i++) {
+    CurrActiveArray[(IdxType)vecQueries[i] * (IdxType)batch_size + (IdxType)i] = true;
+  }
+
+  vertexSubset Frontier(n, frontier);
+
+  
+  long iteration = 0;
+  size_t totalActivated = 0;
+  size_t totalNoOverlap = 0;
+
+  // for async batching
+  int slots_parameter = P.getOptionIntValue("-slots", 1);
+  int empty_slots = 0;
+  vector<long> next_batch;
+  vector<long> lastQueries;
+  bool _flag_check = true;
+  bool* finish_status = pbbs::new_array<bool>(batch_size);
+  for(long i = 0; i < batch_size; i++) {
+    finish_status[i] = true;
+  }
+  
+  vector<long> queuedQueries;
+  long queued_index = 0;
+  while (!queryQueue.empty()) {
+    queuedQueries.push_back(queryQueue.front());
+    queryQueue.pop();
+  }
+
+  while(!Frontier.isEmpty() || queued_index != queuedQueries.size()){
+    iteration++;
+    // cout << "iteration: " << iteration << endl;
+    totalActivated += Frontier.size();
+
+    // mode: no_dense, remove_duplicates (for batch size > 1)
+    vertexSubset output = edgeMap(G, Frontier, DJ_F(ShortestPathLen, CurrActiveArray, NextActiveArray, batch_size), -1, no_dense|remove_duplicates);
+
+    Frontier.del();
+    Frontier = output;
+
+    std::swap(CurrActiveArray, NextActiveArray);
+    parallel_for(IdxType i = 0; i < totalNumVertices; i++) {
+      NextActiveArray[i] = false;
+    }
+
+    bool* is_batch_finished = pbbs::new_array<bool>(batch_size);
+    for(size_t i = 0; i < batch_size; i++) {
+      is_batch_finished[i] = false;
+    }
+    empty_slots = 0;
+    if (queued_index != queuedQueries.size()) { // there are more queries to process
+      vector<long> empty_slots_vec;
+      for (int i = 0; i < batch_size; i++) {
+        bool is_finished = true;
+        long active_cnt = 0;
+        parallel_for(size_t index = 0; index < n; index++) {
+          if (CurrActiveArray[index * batch_size + i]) {
+            // is_finished = false;
+            pbbs::fetch_and_add(&active_cnt, 1);
+          }
+        }
+        if (active_cnt == 0) {
+          empty_slots++;
+          empty_slots_vec.push_back(i);
+          if (finish_status[i]) {
+            finish_status[i] = false;
+          }
+        }
+      }
+      if (empty_slots == batch_size) {
+        cout << "batch is empty, iteration " << iteration << endl;
+      }
+
+      if (empty_slots >= slots_parameter || (queuedQueries.size()-queued_index <= empty_slots)) {
+        for (int i = 0; i < empty_slots_vec.size(); i++) {
+          if (queued_index < queuedQueries.size()) {
+            long nextQ = queuedQueries[queued_index];
+            queued_index++;
+            int index_in_batch = empty_slots_vec[i];
+            #ifdef OUTPUT 
+              long start = vecQueries[index_in_batch];
+              char outFileName[300];
+              sprintf(outFileName, "SSSP_base_async_output_src%ld.%ld.%ld.out", start, edge_count, batch_size);
+              FILE *fp;
+              fp = fopen(outFileName, "w");
+              for (long j = 0; j < n; j++)
+                fprintf(fp, "%ld %d\n", j, ShortestPathLen[j * batch_size + index_in_batch]);
+              fclose(fp);
+            #endif
+            vecQueries[index_in_batch] = nextQ;
+            finish_status[index_in_batch] = true;
+
+            CurrActiveArray[nextQ * batch_size + index_in_batch] = true;
+            parallel_for(size_t index = 0; index < n; index++) {
+              ShortestPathLen[index * batch_size + index_in_batch] = (intE)MAXPATH;
+            }
+            ShortestPathLen[nextQ * batch_size + index_in_batch] = 0;
+
+            Frontier.toDense();
+            bool* new_d = pbbs::new_array<bool>(n);
+            parallel_for(size_t ii = 0; ii < n; ii++) {
+              new_d[ii] = Frontier.d[ii];
+            }
+            new_d[nextQ] = true;
+            vertexSubset Frontier_new(n, new_d);
+            Frontier.del();
+            Frontier = Frontier_new;
+
+            // cout << "iteration: " << iteration << ": inserting " << nextQ << " into the batch\n";
+            // cout << "current empty slots: " << empty_slots << endl;
+          }
+        }
+      }
+    }
+    // if (queued_index >= queuedQueries.size() && lastQueries.size() == 0) {
+    //   for (int i = 0; i < batch_size; i++) {
+
+    //   }
+    // }
+  }
+
+  // profiling
+  if (should_profile) {
+    
+  }
+
+#ifdef OUTPUT 
+  for (int i = 0; i < batch_size; i++) {
+    long start = vecQueries[i];
+    char outFileName[300];
+    sprintf(outFileName, "SSSP_base_async_output_src%ld.%ld.%ld.out", start, edge_count, batch_size);
+    FILE *fp;
+    fp = fopen(outFileName, "w");
+    for (long j = 0; j < n; j++)
+      fprintf(fp, "%ld %d\n", j, ShortestPathLen[j * batch_size + i]);
+    fclose(fp);
+  }
+#endif
+
+  Frontier.del();
+  pbbs::delete_array(ShortestPathLen, totalNumVertices);
+  pbbs::delete_array(CurrActiveArray, totalNumVertices);
+  pbbs::delete_array(NextActiveArray, totalNumVertices);
+  return make_pair(totalActivated, totalNoOverlap);
+}
+
+template <class vertex>
+pair<size_t, size_t> Compute_Base_Skipping(graph<vertex>& G, std::vector<long> vecQueries, commandLine P, int skipIter, bool should_profile) {
+  size_t n = G.n;
+  size_t edge_count = G.m;
+  long batch_size = vecQueries.size();
+  IdxType totalNumVertices = (IdxType)n * (IdxType)batch_size;
+  intE* ShortestPathLen = pbbs::new_array<intE>(totalNumVertices);
+  bool* CurrActiveArray = pbbs::new_array<bool>(totalNumVertices);
+  bool* NextActiveArray = pbbs::new_array<bool>(totalNumVertices);
+  bool* frontier = pbbs::new_array<bool>(n);
+  parallel_for(size_t i = 0; i < n; i++) {
+    frontier[i] = false;
+  }
+  for(long i = 0; i < batch_size; i++) {
+    frontier[vecQueries[i]] = true;
+  }
+  parallel_for(IdxType i = 0; i < totalNumVertices; i++) {
+    ShortestPathLen[i] = (intE)MAXPATH;
+    CurrActiveArray[i] = false;
+    NextActiveArray[i] = false;
+  }
+  for(long i = 0; i < batch_size; i++) {
+    ShortestPathLen[(IdxType)batch_size * (IdxType)vecQueries[i] + (IdxType)i] = 0;
+  }
+  for(size_t i = 0; i < batch_size; i++) {
+    CurrActiveArray[(IdxType)vecQueries[i] * (IdxType)batch_size + (IdxType)i] = true;
+  }
+
+  vertexSubset Frontier(n, frontier);
+
+  // for profiling
+  long iteration = 0;
+  size_t totalActivated = 0;
+  size_t totalNoOverlap = 0;
+  vector<pair<size_t, double>> affinity_tracking;
+  vector<pair<size_t, double>> affinity_tracking_one;
+  vector<pair<size_t, double>> affinity_tracking_only;
+  size_t* overlaps = pbbs::new_array<size_t>(batch_size);
+
+  for (int i = 0; i < batch_size; i++) {
+    overlaps[i] = 0;
+  }
+
+  vector<double> overlap_scores;
+  size_t accumulated_overlap = 0;
+  size_t accumulated_overlap_one = 0;
+  size_t accumulated_overlap_only= 0;
+  size_t peak_activation = 0;
+  int peak_iter = 0;
+
+  // vector<long> frontier_iterations;
+  // vector<long> overlapped_iterations;
+  // vector<long> accumulated_overlapped_iterations;
+  // vector<long> total_activated_iterations;
+
+  while(!Frontier.isEmpty()){
+    iteration++;
+    totalActivated += Frontier.size();
+
+    // profiling
+    if (should_profile) {
+      
+    }
+
+    // mode: no_dense, remove_duplicates (for batch size > 1)
+    if (iteration > skipIter) {
+      vertexSubset output = edgeMap(G, Frontier, DJ_SKIP_F(ShortestPathLen, CurrActiveArray, NextActiveArray, batch_size), -1, no_dense|remove_duplicates);
+      Frontier.del();
+      Frontier = output;
+    } else {
+      vertexSubset output = edgeMap(G, Frontier, DJ_F(ShortestPathLen, CurrActiveArray, NextActiveArray, batch_size), -1, no_dense|remove_duplicates);
+      Frontier.del();
+      Frontier = output;
+
+      std::swap(CurrActiveArray, NextActiveArray);
+      parallel_for(IdxType i = 0; i < totalNumVertices; i++) {
+        NextActiveArray[i] = false;
+      }
+    }
+
+    // Frontier.toDense();
+    // bool* new_d = Frontier.d;
+    // Frontier.d = nullptr;
+    // vertexSubset Frontier_new(n, new_d);
+    // Frontier.del();
+    // Frontier = Frontier_new;
   }
 
   // profiling
@@ -427,7 +686,7 @@ pair<size_t, size_t> Compute_Base(graph<vertex>& G, std::vector<long> vecQueries
   for (int i = 0; i < batch_size; i++) {
     long start = vecQueries[i];
     char outFileName[300];
-    sprintf(outFileName, "SSSP_base_output_src%ld.%ld.%ld.out", start, edge_count, batch_size);
+    sprintf(outFileName, "SSSP_base_skipping_output_src%ld.%ld.%ld.out", start, edge_count, batch_size);
     FILE *fp;
     fp = fopen(outFileName, "w");
     for (long j = 0; j < n; j++)
