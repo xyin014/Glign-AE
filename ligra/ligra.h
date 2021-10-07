@@ -489,9 +489,11 @@ uintE* Compute_Eval_Prop(graph<vertex>&, vector<long>, commandLine);
 template<class vertex>
 pair<size_t, size_t> Compute_Base(graph<vertex>&, vector<long>, commandLine, bool should_profile=false);
 template<class vertex>
-void Compute_Delay(graph<vertex>&, vector<long>, commandLine, vector<int>, bool should_profile=false);
+pair<size_t, size_t> Compute_Delay(graph<vertex>&, vector<long>, commandLine, vector<int>, bool should_profile=false);
 template<class vertex>
-pair<size_t, size_t> Compute_Base_Skipping(graph<vertex>&, vector<long>, commandLine, bool should_profile=false);
+pair<size_t, size_t> Compute_Delay_Skipping(graph<vertex>&, vector<long>, commandLine, vector<int>, bool should_profile=false);
+template<class vertex>
+pair<size_t, size_t> Compute_Base_Skipping(graph<vertex>&, vector<long>, commandLine, int, bool should_profile=false);
 template<class vertex>
 pair<size_t, size_t> Compute_Base_Dynamic(graph<vertex>&, vector<long>, queue<long>&, commandLine, bool should_profile=false);
 
@@ -987,6 +989,10 @@ void scenario3(int argc, char* argv[]) {
     vector<long> batchedQuery;
     batchedQuery = userQueries;
     cout << "=================\n";
+    vector<pair<size_t,size_t>> share_seq;
+    vector<pair<size_t,size_t>> share_base;
+    vector<pair<size_t,size_t>> share_delay;
+
     for (int i = 0; i < combination_max; i++) {
       timer t_seq, t_batch, t_delay;
       std::shuffle(std::begin(batchedQuery), std::end(batchedQuery), rng);
@@ -1000,17 +1006,25 @@ void scenario3(int argc, char* argv[]) {
       cout << endl;
 
       // Sequential
+      size_t seq_F = 0;
       t_seq.start();
       for (int j = 0; j < tmp_batch.size(); j++) {
         vector<long> tmp_single_query;
         tmp_single_query.push_back(tmp_batch[j]);
-        Compute_Base(G,tmp_single_query,P);
+        // Compute_Base(G,tmp_single_query,P);
+        pair<size_t, size_t> share_cnt_seq = Compute_Base_Skipping(G,tmp_single_query,P,0);
+        seq_F += share_cnt_seq.first;
+        share_seq.push_back(share_cnt_seq);
       }
       t_seq.stop();
+      cout << "seq F: " << seq_F << endl;
 
       // Batching
       t_batch.start();
-      Compute_Base(G,tmp_batch,P);
+      // Compute_Base(G,tmp_batch,P);
+      pair<size_t, size_t> share_cnt_base = Compute_Base_Skipping(G,tmp_batch,P,0);
+      cout << "base F: " << share_cnt_base.first << endl;
+      share_base.push_back(share_cnt_base);
       t_batch.stop();
 
 
@@ -1041,7 +1055,10 @@ void scenario3(int argc, char* argv[]) {
       cout << "Total delays (delta): " << total_delays << endl;
 
       t_delay.start();
-      Compute_Delay(G,tmp_batch,P,dist_to_high);
+      // Compute_Delay(G,tmp_batch,P,dist_to_high);
+      pair<size_t, size_t> share_cnt = Compute_Delay_Skipping(G,tmp_batch,P,dist_to_high);
+      cout << "delay F: " << share_cnt.first << endl;
+      share_delay.push_back(share_cnt);
       t_delay.stop();
 
       double seq_time = t_seq.totalTime;
@@ -1054,13 +1071,34 @@ void scenario3(int argc, char* argv[]) {
       cout << "Batching speedup: " << seq_time / batch_time << endl;
       cout << "Delayed batching speedup: " << seq_time / delay_time << endl;
 
-      // profiling the affinities
-      Compute_Base(G,tmp_batch,P,true);
-      Compute_Delay(G,tmp_batch,P,dist_to_high,true);
+      // // profiling the affinities
+      // Compute_Base(G,tmp_batch,P,true);
+      // Compute_Delay(G,tmp_batch,P,dist_to_high,true);
 
       cout << "=================\n";
     }
-      
+    vector<size_t> share_denominator;
+    double share_ratio_base = 0.0;
+    double share_ratio_delay = 0.0;
+    for (int i = 0; i < share_seq.size(); i+=bSize) {
+      size_t temp = 0;
+      for (int j = i; j < i+bSize; j++) {
+        temp += share_seq[j].first;
+      }
+      share_denominator.push_back(temp);
+    }
+    cout << "share_denominator size: " << share_denominator.size() << endl;
+    for (int i = 0; i < share_delay.size(); i++) {
+      size_t denominator = share_denominator[i];
+      size_t nominator_base = share_base[i].first;
+      size_t nominator_delay = share_delay[i].first;
+      cout << "count: " << nominator_base << " " << nominator_delay << " " << denominator << endl;
+      share_ratio_base += 1.0*nominator_base/denominator;
+      share_ratio_delay += 1.0*nominator_delay/denominator;
+    }
+    cout << "base average sharing ratio: " << share_ratio_base/share_denominator.size() << endl;
+    cout << "delay average sharing ratio: " << share_ratio_delay/share_denominator.size() << endl;
+
     // }
     G.del();
     pbbs::delete_array(distances, n);
@@ -1090,7 +1128,6 @@ void scenario3(int argc, char* argv[]) {
     for (int i = 0; i < high_deg_batch; i++) {
       highdegQ.push_back(vIDDegreePairs[i].first);
       cout << vIDDegreePairs[i].first << ", degree: " << vIDDegreePairs[i].second << endl;
-
     }
 
     uintE* distances_multiple;
@@ -1121,6 +1158,10 @@ void scenario3(int argc, char* argv[]) {
     vector<long> batchedQuery;
     batchedQuery = userQueries;
     cout << "=================\n";
+    vector<pair<size_t,size_t>> share_seq;
+    vector<pair<size_t,size_t>> share_base;
+    vector<pair<size_t,size_t>> share_delay;
+
     for (int i = 0; i < combination_max; i++) {
       timer t_seq, t_batch, t_delay;
       std::shuffle(std::begin(batchedQuery), std::end(batchedQuery), rng);
@@ -1132,15 +1173,18 @@ void scenario3(int argc, char* argv[]) {
         cout << tmp_query_id << " ";
       }
       cout << endl;
-
       // Sequential
+      size_t seq_F = 0;
       t_seq.start();
       for (int j = 0; j < tmp_batch.size(); j++) {
         vector<long> tmp_single_query;
         tmp_single_query.push_back(tmp_batch[j]);
-        Compute_Base(G,tmp_single_query,P);
+        pair<size_t, size_t> share_cnt = Compute_Base_Skipping(G,tmp_single_query,P,0);
+        seq_F += share_cnt.first;
+        share_seq.push_back(share_cnt);
       }
       t_seq.stop();
+      cout << "seq F: " << seq_F << endl;
 
       // Batching
       vector<int> dummy_dist;
@@ -1149,7 +1193,9 @@ void scenario3(int argc, char* argv[]) {
       }
       t_batch.start();
       for (int r = 0; r < rounds; r++) {
-        Compute_Base(G,tmp_batch,P);
+        pair<size_t, size_t> share_cnt = Compute_Base_Skipping(G,tmp_batch,P,0);
+        cout << "base F: " << share_cnt.first << endl;
+        share_base.push_back(share_cnt);
         // Compute_Delay(G,tmp_batch,P,dummy_dist);
       }
       t_batch.stop();
@@ -1182,27 +1228,14 @@ void scenario3(int argc, char* argv[]) {
 
       t_delay.start();
       for (int r = 0; r < rounds; r++) {
-        Compute_Delay(G,tmp_batch,P,dist_to_high);
+        pair<size_t, size_t> share_cnt = Compute_Delay_Skipping(G,tmp_batch,P,dist_to_high);
+        cout << "delay F: " << share_cnt.first << endl;
+        share_delay.push_back(share_cnt);
         // Compute_Delay(G,tmp_batch,P,dummy_dist);
         // Compute_Base(G,tmp_batch,P);
       }
       t_delay.stop();
 
-      // // Batching
-      // t_batch.start();
-      // for (int r = 0; r < rounds; r++) {
-      //   Compute_Base(G,tmp_batch,P);
-      // }
-      // t_batch.stop();
-
-      // // Sequential
-      // t_seq.start();
-      // for (int j = 0; j < tmp_batch.size(); j++) {
-      //   vector<long> tmp_single_query;
-      //   tmp_single_query.push_back(tmp_batch[j]);
-      //   Compute_Base(G,tmp_single_query,P);
-      // }
-      // t_seq.stop();
 
       double seq_time = t_seq.totalTime;
       double batch_time = t_batch.totalTime / rounds;
@@ -1214,19 +1247,34 @@ void scenario3(int argc, char* argv[]) {
       cout << "Batching speedup: " << seq_time / batch_time << endl;
       cout << "Delayed batching speedup: " << seq_time / delay_time << endl;
 
-      // profiling the affinities
-      Compute_Base(G,tmp_batch,P,true);
-      Compute_Delay(G,tmp_batch,P,dist_to_high,true);
-
-      // // To do: remove
-      // for (int j = 0; j < tmp_batch.size(); j++) {
-      //   vector<long> tmp_single_query;
-      //   tmp_single_query.push_back(tmp_batch[j]);
-      //   Compute_Base(G,tmp_single_query,P, true);
-      // }
+      // // profiling the affinities
+      // Compute_Base(G,tmp_batch,P,true);
+      // Compute_Delay(G,tmp_batch,P,dist_to_high,true);
       cout << "=================\n";
     }
-      
+
+    vector<size_t> share_denominator;
+    double share_ratio_base = 0.0;
+    double share_ratio_delay = 0.0;
+    for (int i = 0; i < share_seq.size(); i+=bSize) {
+      size_t temp = 0;
+      for (int j = i; j < i+bSize; j++) {
+        temp += share_seq[j].first;
+      }
+      share_denominator.push_back(temp);
+    }
+    cout << "share_denominator size: " << share_denominator.size() << endl;
+    for (int i = 0; i < share_delay.size(); i++) {
+      size_t denominator = share_denominator[i];
+      size_t nominator_base = share_base[i].first;
+      size_t nominator_delay = share_delay[i].first;
+      cout << "count: " << nominator_base << " " << nominator_delay << " " << denominator << endl;
+      share_ratio_base += 1.0*nominator_base/denominator;
+      share_ratio_delay += 1.0*nominator_delay/denominator;
+    }
+    cout << "base average sharing ratio: " << share_ratio_base/share_denominator.size() << endl;
+    cout << "delay average sharing ratio: " << share_ratio_delay/share_denominator.size() << endl;
+
     // }
     G.del();
     pbbs::delete_array(distances, n);
@@ -3204,11 +3252,11 @@ void scenario2(int argc, char* argv[]) {
       cout << "\nsequential evaluation..\n";
       share1 = bufferStreaming(G, truncatedQueries, 1, P, true);
       for (int i = 0; i < combination_max; i+=bSize) {
-      size_t temp = 0;
-      for (int j = i; j < i+bSize; j++) {
-        temp += share1[j].first;
-      }
-      total_N.push_back(temp);
+        size_t temp = 0;
+        for (int j = i; j < i+bSize; j++) {
+          temp += share1[j].first;
+        }
+        total_N.push_back(temp);
       }
       cout << "seq: \n";
       for (int i = 0; i < total_N.size(); i++) {
