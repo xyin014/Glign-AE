@@ -223,6 +223,7 @@ uintE* Compute_Eval_Prop(graph<vertex>& G, std::vector<long> vecQueries, command
   return ret;
 }
 
+
 template <class vertex>
 pair<size_t, size_t> Compute_Base(graph<vertex>& G, std::vector<long> vecQueries, commandLine P, bool should_profile) {
   size_t n = G.n;
@@ -280,7 +281,7 @@ pair<size_t, size_t> Compute_Base(graph<vertex>& G, std::vector<long> vecQueries
   while(!Frontier.isEmpty()){
     iteration++;
     totalActivated += Frontier.size();
-
+    // cout << Frontier.size() << endl;
     // profiling
     if (should_profile) {
     }
@@ -296,7 +297,7 @@ pair<size_t, size_t> Compute_Base(graph<vertex>& G, std::vector<long> vecQueries
       NextActiveArray[i] = false;
     }
   }
-
+  // cout << endl;
   // profiling
   if (should_profile) {
   }
@@ -324,10 +325,12 @@ pair<size_t, size_t> Compute_Base(graph<vertex>& G, std::vector<long> vecQueries
 
 template <class vertex>
 pair<size_t, size_t> Compute_Base_Skipping(graph<vertex>& G, std::vector<long> vecQueries, commandLine P, int skipIter, bool should_profile) {
-
   return make_pair(0,0);
 }
-
+template <class vertex>
+pair<size_t, size_t> Compute_Delay_Skipping(graph<vertex>& G, std::vector<long> vecQueries, commandLine P, std::vector<int> defer_vec, bool should_profile) {
+  return make_pair(0,0);
+}
 template <class vertex>
 pair<size_t, size_t> Compute_Base_Dynamic(graph<vertex>& G, std::vector<long> vecQueries, queue<long>& queryQueue, commandLine P, bool should_profile) {
   return make_pair(0,0);

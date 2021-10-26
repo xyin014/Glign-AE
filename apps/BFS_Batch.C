@@ -265,7 +265,7 @@ pair<size_t, size_t> Compute_Base(graph<vertex>& G, std::vector<long> vecQueries
   while(!Frontier.isEmpty()){
     iteration++;
     totalActivated += Frontier.size();
-
+    // cout << Frontier.size() << endl;
     // profiling
     if (should_profile) {
       
@@ -282,7 +282,8 @@ pair<size_t, size_t> Compute_Base(graph<vertex>& G, std::vector<long> vecQueries
       NextActiveArray[i] = false;
     }
   }
-
+  
+  // cout << endl;
   // profiling
   if (should_profile) {
     
@@ -351,7 +352,7 @@ pair<size_t, size_t> Compute_Base_Skipping(graph<vertex>& G, std::vector<long> v
   while(!Frontier.isEmpty()){
     iteration++;
     totalActivated += Frontier.size();
-
+    
     // mode: no_dense, remove_duplicates (for batch size > 1)
     vertexSubset output = edgeMap(G, Frontier, BFSLV_SKIP_F(Levels, batch_size), -1, no_dense|remove_duplicates);
     

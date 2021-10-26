@@ -68,9 +68,10 @@ struct PR_Vertex_Reset {
 
 template <class vertex>
 void Compute(graph<vertex>& GA, commandLine P) {
-  long maxIters = P.getOptionLongValue("-maxiters",100);
+  long maxIters = P.getOptionLongValue("-maxiters",10);
   const intE n = GA.n;
-  const double damping = 0.85, epsilon = 0.0000001;
+  size_t edge_count = GA.m;
+  const double damping = 0.85, epsilon = 0.01;
   
   double one_over_n = 1/(double)n;
   double* p_curr = newA(double,n);
@@ -91,10 +92,22 @@ void Compute(graph<vertex>& GA, commandLine P) {
       p_curr[i] = fabs(p_curr[i]-p_next[i]);
       }}
     double L1_norm = sequence::plusReduce(p_curr,n);
-    if(L1_norm < epsilon) break;
+    if(L1_norm < epsilon) {
+      swap(p_curr,p_next);
+      break;
+    }
     //reset p_curr
     vertexMap(Frontier,PR_Vertex_Reset(p_curr));
     swap(p_curr,p_next);
   }
+  #ifdef OUTPUT 
+    char outFileName[300];
+    sprintf(outFileName, "PageRank_base_output_src_%ld_edges.out", edge_count);
+    FILE *fp;
+    fp = fopen(outFileName, "w");
+    for (long j = 0; j < n; j++)
+        fprintf(fp, "%ld %lf\n", j, p_curr[j]);
+    fclose(fp);
+  #endif
   Frontier.del(); free(p_curr); free(p_next); 
 }

@@ -224,7 +224,7 @@ uintE* Compute_Eval_Prop(graph<vertex>& G, std::vector<long> vecQueries, command
 }
 
 template <class vertex>
-pair<size_t, size_t>  Compute_Base(graph<vertex>& G, std::vector<long> vecQueries, commandLine P, bool should_profile) {
+pair<size_t, size_t> Compute_Base(graph<vertex>& G, std::vector<long> vecQueries, commandLine P, bool should_profile) {
   size_t n = G.n;
   size_t edge_count = G.m;
   long batch_size = vecQueries.size();
@@ -280,7 +280,7 @@ pair<size_t, size_t>  Compute_Base(graph<vertex>& G, std::vector<long> vecQuerie
   while(!Frontier.isEmpty()){
     iteration++;
     totalActivated += Frontier.size();
-
+    // cout << Frontier.size() << endl;
     // profiling
     if (should_profile) {
     }
@@ -296,7 +296,7 @@ pair<size_t, size_t>  Compute_Base(graph<vertex>& G, std::vector<long> vecQuerie
       NextActiveArray[i] = false;
     }
   }
-
+  // cout << endl;
   // profiling
   if (should_profile) {
   }
@@ -324,17 +324,19 @@ pair<size_t, size_t>  Compute_Base(graph<vertex>& G, std::vector<long> vecQuerie
 
 template <class vertex>
 pair<size_t, size_t> Compute_Base_Skipping(graph<vertex>& G, std::vector<long> vecQueries, commandLine P, int skipIter, bool should_profile) {
-
   return make_pair(0,0);
 }
-
+template <class vertex>
+pair<size_t, size_t> Compute_Delay_Skipping(graph<vertex>& G, std::vector<long> vecQueries, commandLine P, std::vector<int> defer_vec, bool should_profile) {
+  return make_pair(0,0);
+}
 template <class vertex>
 pair<size_t, size_t> Compute_Base_Dynamic(graph<vertex>& G, std::vector<long> vecQueries, queue<long>& queryQueue, commandLine P, bool should_profile) {
   return make_pair(0,0);
 }
 
 template <class vertex>
-void Compute_Delay(graph<vertex>& G, std::vector<long> vecQueries, commandLine P, std::vector<int> defer_vec, bool should_profile) {
+pair<size_t, size_t> Compute_Delay(graph<vertex>& G, std::vector<long> vecQueries, commandLine P, std::vector<int> defer_vec, bool should_profile) {
   size_t n = G.n;
   size_t edge_count = G.m;
   long batch_size = vecQueries.size();
@@ -606,4 +608,5 @@ void Compute_Delay(graph<vertex>& G, std::vector<long> vecQueries, commandLine P
   pbbs::delete_array(NextActiveArray, totalNumVertices);
   pbbs::delete_array(overlaps, batch_size);
   pbbs::delete_array(ViterbiVal, totalNumVertices);
+  return make_pair(totalActivated, 0);
 }

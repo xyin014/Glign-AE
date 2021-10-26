@@ -72,6 +72,45 @@ struct DJ_F {
   inline bool cond (uintE d) { return cond_true(d); } 
 };
 
+struct DJ_Chunk_F {
+  intE* ShortestPathLen;
+  long BatchSize;
+
+  DJ_Chunk_F(intE* _ShortestPathLen, long _BatchSize) : 
+    ShortestPathLen(_ShortestPathLen), BatchSize(_BatchSize) {}
+  
+  inline bool update (uintE s, uintE d, intE edgeLen) { //Update
+    bool ret = false;
+    IdxType s_begin = s * BatchSize;
+    IdxType d_begin = d * BatchSize;
+
+    for (long j = 0; j < BatchSize; j++) {
+      intE newValue = ShortestPathLen[s_begin + j] + edgeLen;
+      if (ShortestPathLen[d_begin + j] > newValue) {
+        // Visited[d_begin + j] = true;
+        ShortestPathLen[d_begin + j] = newValue;
+        ret = true;
+      }
+    }
+    return ret;
+  }
+  
+  inline bool updateAtomic (uintE s, uintE d, intE edgeLen){ //atomic version of Update
+    bool ret = false;
+    IdxType s_begin = s * BatchSize;
+    IdxType d_begin = d * BatchSize;
+    for (long j = 0; j < BatchSize; j++) {
+        intE newValue = ShortestPathLen[s_begin + j] + edgeLen;
+        if (writeMin(&ShortestPathLen[d_begin + j], newValue)) {
+          ret = true;
+        }
+    }
+    return ret;
+  }
+  //cond function checks if vertex has been visited yet
+  inline bool cond (uintE d) { return cond_true(d); } 
+};
+
 struct DJ_SKIP_F {
   intE* ShortestPathLen;
   bool* CurrActiveArray;
@@ -316,19 +355,9 @@ pair<size_t, size_t> Compute_Base(graph<vertex>& G, std::vector<long> vecQueries
   size_t peak_activation = 0;
   int peak_iter = 0;
 
-  // vector<long> frontier_iterations;
-  // vector<long> overlapped_iterations;
-  // vector<long> accumulated_overlapped_iterations;
-  // vector<long> total_activated_iterations;
-
   while(!Frontier.isEmpty()){
     iteration++;
     totalActivated += Frontier.size();
-    // cout << Frontier.size() << endl;
-    // profiling
-    if (should_profile) {
-      
-    }
 
     // mode: no_dense, remove_duplicates (for batch size > 1)
     vertexSubset output = edgeMap(G, Frontier, DJ_F(ShortestPathLen, CurrActiveArray, NextActiveArray, batch_size), -1, no_dense|remove_duplicates);
@@ -336,23 +365,12 @@ pair<size_t, size_t> Compute_Base(graph<vertex>& G, std::vector<long> vecQueries
     Frontier.del();
     Frontier = output;
 
-    // Frontier.toDense();
-    // bool* new_d = Frontier.d;
-    // Frontier.d = nullptr;
-    // vertexSubset Frontier_new(n, new_d);
-    // Frontier.del();
-    // Frontier = Frontier_new;
-
     std::swap(CurrActiveArray, NextActiveArray);
     parallel_for(IdxType i = 0; i < totalNumVertices; i++) {
       NextActiveArray[i] = false;
     }
   }
   // cout << endl;
-  // profiling
-  if (should_profile) {
-    
-  }
 
 #ifdef OUTPUT 
   for (int i = 0; i < batch_size; i++) {
@@ -372,6 +390,250 @@ pair<size_t, size_t> Compute_Base(graph<vertex>& G, std::vector<long> vecQueries
   pbbs::delete_array(CurrActiveArray, totalNumVertices);
   pbbs::delete_array(NextActiveArray, totalNumVertices);
   pbbs::delete_array(overlaps, batch_size);
+  return make_pair(totalActivated, totalNoOverlap);
+}
+
+template <class vertex>
+pair<size_t, size_t> Compute_Chunk(graph<vertex>& G, std::vector<long> vecQueries, const vector<set<long>>& Tables, const long* vtx2chunk, commandLine P, bool should_profile) {
+  size_t n = G.n;
+  size_t edge_count = G.m;
+  long batch_size = vecQueries.size();
+  IdxType totalNumVertices = (IdxType)n * (IdxType)batch_size;
+  intE* ShortestPathLen = pbbs::new_array<intE>(totalNumVertices);
+  bool* frontier = pbbs::new_array<bool>(n);
+  parallel_for(size_t i = 0; i < n; i++) {
+    frontier[i] = false;
+  }
+  for(long i = 0; i < batch_size; i++) {
+    frontier[vecQueries[i]] = true;
+  }
+  parallel_for(IdxType i = 0; i < totalNumVertices; i++) {
+    ShortestPathLen[i] = (intE)MAXPATH;
+  }
+  for(long i = 0; i < batch_size; i++) {
+    ShortestPathLen[(IdxType)batch_size * (IdxType)vecQueries[i] + (IdxType)i] = 0;
+  }
+
+  vertexSubset Frontier(n, frontier);
+
+  // for profiling
+  long iteration = 0;
+  size_t totalActivated = 0;
+  size_t totalNoOverlap = 0;
+
+  // vector<set<long>> Tables;
+  // Tables.insert(Tables.end(), C_Set.begin(), C_Set.end());
+  long chunk_size = Tables.size();
+  // long* vtx2chunk = pbbs::new_array<long>(n);
+  // // long* vtx2chunk = newA(long,n);
+  // parallel_for(long i = 0; i < n; i++) {
+  //   vtx2chunk[i] = -1;
+  // }
+  // parallel_for(long i = 0; i < chunk_size; i++) {
+  //   set<long> tmp_chunk = Tables[i];
+  //   // cout << "Chunk " << i << endl;
+  //   for (auto e : tmp_chunk) {
+  //     // cout << "\t " << e << endl;
+  //     vtx2chunk[e] = i;
+  //   }
+  // }
+  cout << "chunk_size: " << chunk_size << endl;
+  long* chunkCnt = pbbs::new_array<long>(chunk_size);
+  parallel_for(long i = 0; i < chunk_size; i++) {
+    chunkCnt[i] = 0;
+  }
+  cout << chunkCnt << endl;
+  // vector<long> chunkCnt(chunk_size);
+  cout << "Query: " << vecQueries[0] << endl;
+  while(!Frontier.isEmpty()){
+    iteration++;
+    cout << "iteration: " << iteration << endl;
+    totalActivated += Frontier.size();
+    // cout << "Frontier size: " << Frontier.size() << endl;
+    // should find the chunk to be processed.
+    // Such a chunk is needed by most number of jobs. 
+    Frontier.toDense();
+    bool* f_old = Frontier.d;
+    Frontier.d = nullptr;
+    Frontier.del();
+
+    // bool* f_new = pbbs::new_array<bool>(n);
+    // bool* f_new = newA(bool,n);
+    // bool* f_next = pbbs::new_array<bool>(n);
+    bool* f_next = newA(bool,n);
+    // bool* f_remains = pbbs::new_array<bool>(n);
+    bool* f_remains = newA(bool,n);
+    // long* chunkCnt = pbbs::new_array<long>(chunk_size);
+    // long* chunkCnt = newA(long,chunk_size);
+    // vector<long> chunkCnt(chunk_size);
+    // parallel_for(long i = 0; i < chunk_size; i++) {
+    //   chunkCnt[i] = 0;
+    // }
+    {parallel_for(long i = 0; i < n; i++) {
+      // f_new[i] = f_old[i];
+      f_next[i] = false;
+      f_remains[i] = false;
+      if (f_old[i]) {
+        // if (vtx2chunk[i] == -1) cout << "-1, the error!!\n";
+        writeAdd(&chunkCnt[vtx2chunk[i]],1l);
+      }
+    }}
+    // cout << "Chunk " << distance(chunkCnt, max_element(chunkCnt, chunkCnt + chunk_size))  << " is required most." << endl;
+    // long load_chunk_id = distance(chunkCnt, max_element(chunkCnt, chunkCnt + chunk_size));
+    // cout << "index = " << load_chunk_id << endl;
+    long* max_chunk_needed = max_element(chunkCnt, chunkCnt + chunk_size);
+    long load_chunk_id = max_chunk_needed-chunkCnt;
+    // cout << "max count needed " << *max_chunk_needed << ", index = " << max_chunk_needed-chunkCnt << endl;
+    // long load_chunk_id = std::distance(chunkCnt.begin(),std::max_element(chunkCnt.begin(), chunkCnt.end()));
+
+    // cout << "\tDEBUG pos a-1: " << endl;
+    {parallel_for(long i = 0; i < n; i++) {
+      if (f_old[i]) {
+        // if (vtx2chunk[i] == -1) cout << "-1, the error!!\n";
+        if (vtx2chunk[i] != load_chunk_id) {
+          f_old[i] = false;
+          f_remains[i] = true;
+        }
+      }
+    }}
+    // cout << "\tDEBUG pos a-2: " << endl;
+    // Frontier.d = nullptr;
+    vertexSubset Frontier_new(n, f_old);
+    // cout << "\tDEBUG pos a-3: " << endl;
+    // 
+    // cout << "start processing chunks... iteration " << iteration << "\n";
+    while (!Frontier_new.isEmpty()) {
+      // Frontier_new.toDense();
+      // for (long i = 0; i < n;i++) {
+      //   if (Frontier_new.d[i]) {
+      //     cout << i << endl;
+      //   }
+      // }
+      // cout << "\tFrontier_new size: " << Frontier_new.size() << endl;
+      vertexSubset output = edgeMap(G, Frontier_new, DJ_Chunk_F(ShortestPathLen, batch_size), -1, no_dense|remove_duplicates);
+      // cout << "\t\t DEBUG pos 1: " << endl;
+      // bool* f_next_chunk = newA(bool,n);
+      // cout << "\t\t output size: " << output.size() << endl;
+      output.toDense();
+      // cout << "\t\t DEBUG pos 1-2: " << endl;
+      bool* new_output = output.d;
+      {parallel_for(long i = 0; i < n; i++) {
+        // f_next_chunk[i] = output.d[i];
+        if (new_output[i]) {
+          // cout << "new_output[" << i << "]\n";
+          // if (vtx2chunk[i] == -1) cout << "-1, the error!!\n";
+          if (vtx2chunk[i] != load_chunk_id) {
+            // cout << "load_chunk_id " << load_chunk_id << "\n";
+            f_next[i] = true;
+            new_output[i] = false;
+          }
+        }
+      }}
+      // cout << "\t\t DEBUG pos 2: " << endl;
+      
+      // cout << "\t\t DEBUG pos 3: " << endl;
+      // vertexSubset Next_Chunk(n, f_next_chunk);
+      // cout << "\t\t DEBUG pos 4: " << endl;
+      vertexSubset Next_Chunk(n, new_output);
+      output.d = nullptr;
+      output.del();
+      // cout << "\tNext_Chunk size: " << Next_Chunk.size() << endl;
+      if (Next_Chunk.isEmpty())
+      {
+        // cout << "\t\t\tNext_Chunk is empty!\n";
+        // current chunk is finished, should proceed next (remaining) chunk
+        // bool* f_new_chunk = pbbs::new_array<bool>(n);
+        // long* _chunkCnt = pbbs::new_array<long>(chunk_size);
+        // bool* f_new_chunk = newA(bool,n);
+        Frontier_new.toDense();
+        bool* f_new_chunk = Frontier_new.d;
+        Frontier_new.d = nullptr;
+        // long* _chunkCnt = newA(long,chunk_size);
+        // parallel_for(long i = 0; i < chunk_size; i++) {
+        //   _chunkCnt[i] = 0;
+        // }
+        parallel_for(long i = 0; i < chunk_size; i++) {
+          chunkCnt[i] = 0;
+        }
+        // cout << "\t\t DEBUG pos 5: " << endl;
+        {parallel_for(long i = 0; i < n; i++) {
+          // f_new_chunk[i] = f_remains[i];
+          if (f_remains[i]) {
+            writeAdd(&chunkCnt[vtx2chunk[i]],1l);
+          }
+        }}
+        // cout << "\t\t DEBUG pos 6: " << endl;
+        // long _load_chunk_id = distance(chunkCnt, max_element(chunkCnt, chunkCnt + chunk_size));
+        // cout << "index = " << _load_chunk_id << endl;
+        long* _max_chunk_needed = max_element(chunkCnt, chunkCnt + chunk_size);
+        long _load_chunk_id = _max_chunk_needed-chunkCnt;
+        // cout << "max count needed " << *_max_chunk_needed << ", index = " << _max_chunk_needed-chunkCnt << endl;
+        // long _load_chunk_id = std::distance(chunkCnt.begin(),std::max_element(chunkCnt.begin(), chunkCnt.end()));
+        {parallel_for(long i = 0; i < n; i++) {
+          f_new_chunk[i] = false;
+          if (f_remains[i] && (vtx2chunk[i] == _load_chunk_id)) {
+            f_new_chunk[i] = true;
+            f_remains[i] = false;
+          }
+        }}
+        // cout << "\t\t DEBUG pos 6-2: " << endl;
+        // pbbs::delete_array(_chunkCnt, chunk_size);
+        // free(_chunkCnt);
+        // cout << "\t\t DEBUG pos 7: " << endl;
+        vertexSubset _Next_Chunk(n, f_new_chunk);
+        // cout << "\t\t DEBUG pos 8: " << endl;
+        
+        Frontier_new.del();
+        // cout << "\t\t DEBUG pos 9: " << endl;
+        Frontier_new = _Next_Chunk;
+        // cout << "\t\t DEBUG pos 10: " << endl;
+        Next_Chunk.del();
+        // cout << "\t\tFinish Next_Chunk is empty!\n";
+      } else {
+        // cout << "\t\tNext_Chunk is NOT empty!\n";
+        Frontier_new.del();
+        Frontier_new = Next_Chunk;
+      }
+      // cout << "\t\t DEBUG pos 11: " << endl;
+    }
+    // cout << "\t\t DEBUG pos 12: " << endl;
+    // bool* f_new_d = pbbs::new_array<bool>(n);
+    vertexSubset Next_Frontier(n, f_next);
+    // cout << "\t\t DEBUG pos 13: " << endl;
+    
+    // cout << "\t\t DEBUG pos 14: " << endl;
+
+    Frontier = Next_Frontier;
+    // cout << "\t\t DEBUG pos 15: " << endl;
+    // pbbs::delete_array(chunkCnt, chunk_size);
+    // free(chunkCnt);
+    // cout << "== finish one iteration\n";
+    parallel_for(long i = 0; i < chunk_size; i++) {
+      chunkCnt[i] = 0;
+    }
+  }
+  cout << "========finished query(ies)========" << endl;
+
+#ifdef OUTPUT 
+  for (int i = 0; i < batch_size; i++) {
+    long start = vecQueries[i];
+    char outFileName[300];
+    sprintf(outFileName, "SSSP_chunk_output_src%ld.%ld.%ld.out", start, edge_count, batch_size);
+    FILE *fp;
+    fp = fopen(outFileName, "w");
+    for (long j = 0; j < n; j++)
+      fprintf(fp, "%ld %d\n", j, ShortestPathLen[j * batch_size + i]);
+    fclose(fp);
+  }
+#endif
+cout << "========cleaning========" << endl;
+  Frontier.del();
+  // free(vtx2chunk);
+  // pbbs::delete_array(vtx2chunk, n);
+  cout << chunkCnt << endl;
+  pbbs::delete_array(chunkCnt, chunk_size);
+  pbbs::delete_array(ShortestPathLen, totalNumVertices);
+cout << "========finished cleaning========" << endl;
   return make_pair(totalActivated, totalNoOverlap);
 }
 
@@ -520,11 +782,6 @@ pair<size_t, size_t> Compute_Base_Dynamic(graph<vertex>& G, std::vector<long> ve
     // }
   }
 
-  // profiling
-  if (should_profile) {
-    
-  }
-
 #ifdef OUTPUT 
   for (int i = 0; i < batch_size; i++) {
     long start = vecQueries[i];
@@ -580,19 +837,9 @@ pair<size_t, size_t> Compute_Base_Skipping(graph<vertex>& G, std::vector<long> v
   size_t totalActivated = 0;
   size_t totalNoOverlap = 0;
 
-  // vector<long> frontier_iterations;
-  // vector<long> overlapped_iterations;
-  // vector<long> accumulated_overlapped_iterations;
-  // vector<long> total_activated_iterations;
-
   while(!Frontier.isEmpty()){
     iteration++;
     totalActivated += Frontier.size();
-
-    // profiling
-    if (should_profile) {
-      
-    }
 
     // mode: no_dense, remove_duplicates (for batch size > 1)
     if (iteration > skipIter) {
@@ -623,13 +870,6 @@ pair<size_t, size_t> Compute_Base_Skipping(graph<vertex>& G, std::vector<long> v
         NextActiveArray[i] = false;
       }
     }
-
-    // Frontier.toDense();
-    // bool* new_d = Frontier.d;
-    // Frontier.d = nullptr;
-    // vertexSubset Frontier_new(n, new_d);
-    // Frontier.del();
-    // Frontier = Frontier_new;
   }
 
 
@@ -705,17 +945,6 @@ pair<size_t, size_t> Compute_Delay(graph<vertex>& G, std::vector<long> vecQuerie
     Frontier.del();
     Frontier = output;
 
-    // Checking for delayed queries.
-    // TODO: possibly optimization.
-    // timer t_checking;
-    // t_checking.start();
-    // Frontier.toDense();
-    // bool* new_d = pbbs::new_array<bool>(n);
-    // parallel_for(size_t i = 0; i < n; i++) {
-    //   new_d[i] = Frontier.d[i];
-    // }
-
-    
     Frontier.toDense();
     bool* new_d = Frontier.d;
     Frontier.d = nullptr;
@@ -799,33 +1028,14 @@ pair<size_t, size_t> Compute_Delay_Skipping(graph<vertex>& G, std::vector<long> 
   long iteration = 0;
   size_t totalActivated = 0;
 
-  // vector<long> frontier_iterations;
-  // vector<long> overlapped_iterations;
-  // vector<long> accumulated_overlapped_iterations;
-  // vector<long> total_activated_iterations;
-
   while(!Frontier.isEmpty()){
     iteration++;
     totalActivated += Frontier.size();
-
-    // profiling
-    if (should_profile) {
-    }
 
     // mode: no_dense, remove_duplicates (for batch size > 1)
     vertexSubset output = edgeMap(G, Frontier, DJ_SKIP_F(ShortestPathLen, CurrActiveArray, NextActiveArray, batch_size), -1, no_dense|remove_duplicates);
     Frontier.del();
     Frontier = output;
-    
-    // Checking for delayed queries.
-    // TODO: possibly optimization.
-    // timer t_checking;
-    // t_checking.start();
-    // Frontier.toDense();
-    // bool* new_d = pbbs::new_array<bool>(n);
-    // parallel_for(size_t i = 0; i < n; i++) {
-    //   new_d[i] = Frontier.d[i];
-    // }
 
     Frontier.toDense();
     bool* new_d = Frontier.d;
@@ -839,12 +1049,6 @@ pair<size_t, size_t> Compute_Delay_Skipping(graph<vertex>& G, std::vector<long> 
     vertexSubset Frontier_new(n, new_d);
     Frontier.del();
     Frontier = Frontier_new;
-    // t_checking.stop();
-    // t_checking.reportTotal("checking delaying");
-  }
-
-  // profiling
-  if (should_profile) {
   }
 
 #ifdef OUTPUT 
