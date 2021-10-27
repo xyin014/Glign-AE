@@ -3689,7 +3689,8 @@ void test_graphM_Chunk(int argc, char* argv[]) {
     long chunk_size = 0;
     long tmp_block = cache_size / (1.0 + (1.0*vtx_data_size) / graph_size);
     chunk_size = tmp_block / 16; // hardware concurrency
-    long test_size = G.m * chunk_size / graph_size;
+    // long test_size = G.m * chunk_size / graph_size;
+    long test_size = 64*960000l;
     cout << "chunk_size: " << chunk_size << ", num of edges: " << test_size << endl;
     set<set<long>> C_Set;
     set<long> c_table;
@@ -3735,7 +3736,7 @@ void test_graphM_Chunk(int argc, char* argv[]) {
 
     // if (selection == 1) {
       cout << "\nsequential evaluation..\n";
-      share1 = streamingWithChunks(G, truncatedQueries, C_Set, 1, P, true);
+      share1 = streamingWithChunks(G, truncatedQueries, C_Set, bSize, P, true);
     // }
     // if (selection == 2) {
       // cout << "\non the unsorted buffer..\n";
@@ -3869,18 +3870,18 @@ void test_8(int argc, char* argv[]) {
     vector<pair<size_t,size_t>> share_unsorted;
     vector<pair<size_t,size_t>> share_sorted;
 
-    // if (selection == 1) {
+    if (selection == 1) {
       cout << "\nsequential evaluation with skipping..\n";
       share1 = bufferStreamingSkipping(G, truncatedQueries, 1, P, distances, true);
-    // }
-    // if (selection == 2) {
+    }
+    if (selection == 2) {
       cout << "\non the unsorted buffer with skipping..\n";
       share_unsorted = bufferStreamingSkipping(G, truncatedQueries, bSize, P, distances, true);
-    // }
-    // if (selection == 3) {
+    }
+    if (selection == 3) {
       cout << "\non the sorted buffer with skipping..\n";
       share_sorted = bufferStreamingSkipping(G, sortedQueries, bSize, P, distances, true);
-    // }
+    }
 
     vector<size_t> total_N;
     for (int i = 0; i < combination_max; i+=bSize) {
