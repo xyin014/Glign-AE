@@ -491,6 +491,8 @@ pair<size_t, size_t> Compute_Base(graph<vertex>&, vector<long>, commandLine, boo
 template<class vertex>
 pair<size_t, size_t> Compute_Chunk(graph<vertex>&, vector<long>, set<set<long>>&, commandLine, bool should_profile=false);
 template<class vertex>
+pair<size_t, size_t> Compute_Chunk_v2(graph<vertex>&, vector<long>, set<set<long>>&, commandLine, bool should_profile=false);
+template<class vertex>
 pair<size_t, size_t> Compute_Delay(graph<vertex>&, vector<long>, commandLine, vector<int>, bool should_profile=false);
 template<class vertex>
 pair<size_t, size_t> Compute_Delay_Skipping(graph<vertex>&, vector<long>, commandLine, vector<int>, bool should_profile=false);
@@ -3091,7 +3093,7 @@ vector<pair<size_t, size_t>> streamingWithChunks(graph<vertex>& G, std::vector<l
           tmpBatch.push_back(bufferedQueries[i+j]);
         }
         cout << "bufferedQueries " << bufferedQueries.size() << endl;
-        pair<size_t, size_t> share_cnt = Compute_Chunk(G,tmpBatch,Tables, vtx2chunk, P,true);
+        pair<size_t, size_t> share_cnt = Compute_Chunk_v2(G,tmpBatch,Tables, vtx2chunk, P,true);
         cout << "finished batch\n ";
         res.push_back(share_cnt);
         // cout << share_cnt.first << " " << share_cnt.second << endl;
@@ -3690,7 +3692,9 @@ void test_graphM_Chunk(int argc, char* argv[]) {
     long tmp_block = cache_size / (1.0 + (1.0*vtx_data_size) / graph_size);
     chunk_size = tmp_block / 16; // hardware concurrency
     // long test_size = G.m * chunk_size / graph_size;
-    long test_size = 64*960000l;
+    cout << G.m * chunk_size / graph_size << endl;
+    long edges_per_chunk = P.getOptionLongValue("-chunk_edge",960000l);
+    long test_size = edges_per_chunk;
     cout << "chunk_size: " << chunk_size << ", num of edges: " << test_size << endl;
     set<set<long>> C_Set;
     set<long> c_table;
@@ -3734,14 +3738,14 @@ void test_graphM_Chunk(int argc, char* argv[]) {
     //   }
     // }
 
-    // if (selection == 1) {
+    if (selection == 1) {
       cout << "\nsequential evaluation..\n";
-      share1 = streamingWithChunks(G, truncatedQueries, C_Set, bSize, P, true);
-    // }
-    // if (selection == 2) {
-      // cout << "\non the unsorted buffer..\n";
-      // share_unsorted = streamingWithChunks(G, truncatedQueries, C_Set, bSize, P, true);
-    // }
+      share1 = streamingWithChunks(G, truncatedQueries, C_Set, 1, P, true);
+    }
+    if (selection == 2) {
+      cout << "\non the unsorted buffer..\n";
+      share_unsorted = streamingWithChunks(G, truncatedQueries, C_Set, bSize, P, true);
+    }
     // // if (selection == 3) {
     //   cout << "\non the sorted buffer..\n";
     //   share_sorted = asyncStreaming(G, sortedQueries, bSize, P, true);
