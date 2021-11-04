@@ -150,6 +150,7 @@ struct Heterogeneous_F {
                     QueryValues[d_begin + j] = newDist;
                     NextActiveArray[d_begin + j] = benchmark_sssp;
                     ret = true;
+                    continue;
                 }
             } else if (CurrActiveArray[s_begin + j] & benchmark_bfs) {
                 intE sValue = QueryValues[s_begin + j];
@@ -161,6 +162,7 @@ struct Heterogeneous_F {
                     QueryValues[d_begin + j] = newDist;
                     NextActiveArray[d_begin + j] = benchmark_bfs;
                     ret = true;
+                    continue;
                 }
             } else if (CurrActiveArray[s_begin + j] & benchmark_sswp) {
                 // Extract original values resides in the value array
@@ -172,7 +174,8 @@ struct Heterogeneous_F {
                 if (dValue < newWidth) {
                     QueryValues[d_begin + j] = newWidth;
                     NextActiveArray[d_begin + j] = benchmark_sswp;
-                    ret = true;                    
+                    ret = true;
+                    continue;                    
                 }
             }  else if (CurrActiveArray[s_begin + j] & benchmark_ssnp) {
                 // Extract original values resides in the value array
@@ -184,7 +187,8 @@ struct Heterogeneous_F {
                 if (dValue > newWidth) {
                     QueryValues[d_begin + j] = newWidth;
                     NextActiveArray[d_begin + j] = benchmark_sswp;
-                    ret = true;                    
+                    ret = true;
+                    continue;                   
                 }
             } 
         }
@@ -205,6 +209,7 @@ struct Heterogeneous_F {
                 if (writeMin(&QueryValues[d_begin + j], newDist)
                         && CAS(&NextActiveArray[d_begin + j], _empty, benchmark_sssp)) {
                     ret = true;
+                    continue;
                 }
             } else if (cur_active & benchmark_bfs) {
                     // Extract original values resides in the value array
@@ -214,6 +219,7 @@ struct Heterogeneous_F {
                     if (writeMin(&QueryValues[d_begin + j], newDist)
                             && CAS(&NextActiveArray[d_begin + j], _empty, benchmark_bfs)) {
                         ret = true;
+                        continue;
                     }
             } else if (cur_active & benchmark_sswp) {
                 // Extract original values resides in the value array
@@ -224,6 +230,7 @@ struct Heterogeneous_F {
                 if (writeMax(&QueryValues[d_begin + j], newWidth)
                         && CAS(&NextActiveArray[d_begin + j], _empty, benchmark_sswp)) {
                     ret = true;
+                    continue;
                 }
             } else if (cur_active & benchmark_ssnp) {
                 // Extract original values resides in the value array
@@ -233,6 +240,136 @@ struct Heterogeneous_F {
                 // Propagation of value and case of hub vertex.
                 if (writeMin(&QueryValues[d_begin + j], newWidth)
                         && CAS(&NextActiveArray[d_begin + j], _empty, benchmark_sswp)) {
+                    ret = true;
+                    continue;
+                }
+            } 
+        }
+        return ret;
+    }
+
+    inline bool cond_true (int d) { return 1; }
+
+    inline bool cond(uintE d) {
+        return cond_true(d);
+    }
+};
+
+struct Heterogeneous_SKIP_F {
+    intE* QueryValues;
+    long BatchSize;
+
+    Heterogeneous_SKIP_F(intE* _QueryValues, long _BatchSize) : 
+        QueryValues(_QueryValues), BatchSize(_BatchSize) {}
+
+    inline bool update(uintE s, uintE d, intE edgeLen=1) {
+        bool ret = false;
+        IdxType s_begin = s * BatchSize;
+        IdxType d_begin = d * BatchSize;
+        for (long j = 0; j < BatchSize; j++) {
+            // if (CurrActiveArray[s_begin + j] & benchmark_sssp) 
+            {
+                // Extract original values resides in the value array
+                intE sValue = QueryValues[s_begin + j];
+                intE dValue = QueryValues[d_begin + j];
+                // Relax the numeric value of vertex d
+                intE newDist = sValue + edgeLen;  // edgeLen = 1
+                if (dValue > newDist) {
+                    QueryValues[d_begin + j] = newDist;
+                    // NextActiveArray[d_begin + j] = benchmark_sssp;
+                    ret = true;
+                }
+            } 
+            // else if (CurrActiveArray[s_begin + j] & benchmark_bfs) 
+            {
+                intE sValue = QueryValues[s_begin + j];
+                intE dValue = QueryValues[d_begin + j];
+                // Relax the numeric value of vertex d
+                intE newDist = sValue + 1;  // edgeLen = 1
+
+                if (dValue > newDist) {
+                    QueryValues[d_begin + j] = newDist;
+                    // NextActiveArray[d_begin + j] = benchmark_bfs;
+                    ret = true;
+                }
+            } 
+            // else if (CurrActiveArray[s_begin + j] & benchmark_sswp) 
+            {
+                // Extract original values resides in the value array
+                intE sValue = QueryValues[s_begin + j];
+                intE dValue = QueryValues[d_begin + j];
+                // Relax the numeric value of vertex d
+                intE newWidth = std::min(sValue, edgeLen);
+                // Propagation of value and case of hub vertex.
+                if (dValue < newWidth) {
+                    QueryValues[d_begin + j] = newWidth;
+                    // NextActiveArray[d_begin + j] = benchmark_sswp;
+                    ret = true;                    
+                }
+            }  
+            // else if (CurrActiveArray[s_begin + j] & benchmark_ssnp) 
+            {
+                // Extract original values resides in the value array
+                intE sValue = QueryValues[s_begin + j];
+                intE dValue = QueryValues[d_begin + j];
+                // Relax the numeric value of vertex d
+                intE newWidth = std::max(sValue, edgeLen);
+                // Propagation of value and case of hub vertex.
+                if (dValue > newWidth) {
+                    QueryValues[d_begin + j] = newWidth;
+                    // NextActiveArray[d_begin + j] = benchmark_sswp;
+                    ret = true;                    
+                }
+            } 
+        }
+        return ret;
+    }
+
+    inline bool updateAtomic(uintE s, uintE d, intE edgeLen=1) {
+        bool ret = false;
+        IdxType s_begin = s * BatchSize;
+        IdxType d_begin = d * BatchSize;
+        for (long j = 0; j < BatchSize; j++) {
+            // auto cur_active = CurrActiveArray[s_begin + j];
+            // if (cur_active & benchmark_sssp) 
+            {
+                // Extract original values resides in the value array
+                intE sValue = QueryValues[s_begin + j];
+                // Relax the numeric value of vertex d
+                intE newDist = sValue + edgeLen;  // edgeLen = 1
+                if (writeMin(&QueryValues[d_begin + j], newDist)) {
+                    ret = true;
+                }
+            } 
+            // else if (cur_active & benchmark_bfs) 
+            {
+                    // Extract original values resides in the value array
+                    intE sValue = QueryValues[s_begin + j];
+                    // Relax the numeric value of vertex d
+                    intE newDist = sValue + 1;  // edgeLen = 1
+                    if (writeMin(&QueryValues[d_begin + j], newDist)) {
+                        ret = true;
+                    }
+            } 
+            // else if (cur_active & benchmark_sswp) 
+            {
+                // Extract original values resides in the value array
+                intE sValue = QueryValues[s_begin + j];
+                // Relax the numeric value of vertex d
+                intE newWidth = std::min(sValue, edgeLen);
+                // Propagation of value and case of hub vertex.
+                if (writeMax(&QueryValues[d_begin + j], newWidth)) {
+                    ret = true;
+                }
+            } 
+            // else if (cur_active & benchmark_ssnp) 
+            {
+                // Extract original values resides in the value array
+                intE sValue = QueryValues[s_begin + j];
+                // Relax the numeric value of vertex d
+                intE newWidth = std::max(sValue, edgeLen);
+                // Propagation of value and case of hub vertex.
+                if (writeMin(&QueryValues[d_begin + j], newWidth)) {
                     ret = true;
                 }
             } 
@@ -379,96 +516,10 @@ void Compute_Heter_Base(graph<vertex>& G, std::vector<pair<long, benchmarkType>>
   // for profiling
   long iteration = 0;
   size_t totalActivated = 0;
-  vector<pair<size_t, double>> affinity_tracking;
-  vector<pair<size_t, double>> affinity_tracking_one;
-  vector<pair<size_t, double>> affinity_tracking_only;
-  size_t* overlaps = pbbs::new_array<size_t>(batch_size);
-
-  for (int i = 0; i < batch_size; i++) {
-    overlaps[i] = 0;
-  }
-
-  vector<double> overlap_scores;
-  size_t accumulated_overlap = 0;
-  size_t accumulated_overlap_one = 0;
-  size_t accumulated_overlap_only= 0;
-  size_t peak_activation = 0;
-  int peak_iter = 0;
 
   while(!Frontier.isEmpty()){
     iteration++;
     totalActivated += Frontier.size();
-
-    // profiling
-    if (should_profile) {
-      if (Frontier.size() > peak_activation) {
-        peak_activation = Frontier.size();
-        peak_iter = iteration;
-      }
-
-      bool* overlap_set = pbbs::new_array<bool>(n); // activated for all queries
-      bool* overlap_set_one = pbbs::new_array<bool>(n); // only activated for at least half of queries
-      bool* overlap_set_only = pbbs::new_array<bool>(n);
-      parallel_for(size_t i = 0; i < n; i++) {
-        overlap_set[i] = true;
-        overlap_set_one[i] = false;
-        overlap_set_only[i] = false;
-      }
-      parallel_for(size_t index = 0; index < n; index++) {
-        int tmp_flag = 0;
-        for (int i = 0; i < batch_size; i++) {
-          // if the vertex is activated for all queries...
-          overlap_set[index] = overlap_set[index] && CurrActiveArray[index * batch_size + i];
-          if (CurrActiveArray[index * batch_size + i]) {
-            tmp_flag++;
-          }
-        }
-        // activated for at least half of the queries.
-        if (tmp_flag >= batch_size/2) {
-          overlap_set_one[index] = true;
-        }
-        // only one is activated.
-        if (tmp_flag == 1) {
-          overlap_set_only[index] = true;
-        }
-        // the summation
-        for (int i = 0; i < batch_size; i++) {
-          if (tmp_flag == i+1) {
-            pbbs::fetch_and_add(&overlaps[i], 1);
-          }
-        }
-      } // end parallel_for
-      size_t overlap_size = 0;
-      size_t overlap_size_one = 0;
-      size_t overlap_size_only = 0;
-      parallel_for(size_t j = 0; j < n; j++) {
-        if (overlap_set[j]) {
-          pbbs::fetch_and_add(&overlap_size, 1);
-        }
-        if (overlap_set_one[j]) {
-          pbbs::fetch_and_add(&overlap_size_one, 1);
-        }
-        if (overlap_set_only[j]) {
-          pbbs::fetch_and_add(&overlap_size_only, 1);
-        }
-      } // end parallel_for
-      accumulated_overlap += overlap_size;
-      accumulated_overlap_one += overlap_size_one;
-      accumulated_overlap_only += overlap_size_only;
-      double total_overlap_score = 0.0;
-      for (int i = 0; i < batch_size; i++) {
-        total_overlap_score += (i+1) * overlaps[i] * 1.0;
-      }
-      total_overlap_score = total_overlap_score / totalActivated / batch_size;
-      overlap_scores.push_back(total_overlap_score);
-
-      affinity_tracking.push_back(make_pair(Frontier.size(), 1.0 * overlap_size / Frontier.size()));
-      affinity_tracking_one.push_back(make_pair(Frontier.size(), 1.0 * overlap_size_one / Frontier.size()));
-      affinity_tracking_only.push_back(make_pair(Frontier.size(), 1.0 * overlap_size_only / Frontier.size()));
-      pbbs::delete_array(overlap_set, n);
-      pbbs::delete_array(overlap_set_one, n);
-      pbbs::delete_array(overlap_set_only, n);
-    }
 
     // mode: no_dense, remove_duplicates (for batch size > 1)
     vertexSubset output = edgeMap(G, Frontier, Heterogeneous_F(QueryValues, CurrActiveArray, NextActiveArray, batch_size), -1, no_dense|remove_duplicates);
@@ -476,7 +527,7 @@ void Compute_Heter_Base(graph<vertex>& G, std::vector<pair<long, benchmarkType>>
     Frontier.del();
     Frontier = output;
 
-    // Frontier.toDense();
+    Frontier.toDense();
     // bool* new_d = Frontier.d;
     // Frontier.d = nullptr;
     // vertexSubset Frontier_new(n, new_d);
@@ -490,60 +541,12 @@ void Compute_Heter_Base(graph<vertex>& G, std::vector<pair<long, benchmarkType>>
   }
 
   // profiling
-  if (should_profile) {
-    double total_affinity = 0.0;
-    double total_overlap_score = 0.0;
-    cout << "Base peak activation: " << peak_activation << endl;
-    cout << "Base peak iteration: " << peak_iter << endl;
-
-    cout << "Base Total iterations: " << iteration << endl;
-    cout << "Base Total activations: " << totalActivated << endl;
-    double affinity_sum = 0.0;
-    for (int i = 0; i < affinity_tracking.size(); i++) {
-      affinity_sum += affinity_tracking[i].first * affinity_tracking[i].second;
-    }
-    total_affinity = affinity_sum/totalActivated;
-    cout << "Base AND Total affinity: " << total_affinity << endl;
-
-    double affinity_sum_one = 0.0;
-    double total_affinity_one = 0.0;
-    for (int i = 0; i < affinity_tracking_one.size(); i++) {
-      affinity_sum_one += affinity_tracking_one[i].first * affinity_tracking_one[i].second;
-    }
-    total_affinity_one = affinity_sum_one/totalActivated;
-    cout << "Base OR Total affinity: " << total_affinity_one << endl;
-
-    double affinity_sum_only = 0.0;
-    double total_affinity_only = 0.0;
-    for (int i = 0; i < affinity_tracking_only.size(); i++) {
-      affinity_sum_only += affinity_tracking_only[i].first * affinity_tracking_only[i].second;
-    }
-    total_affinity_only = affinity_sum_only/totalActivated;
-    cout << "Base [Only] affinity: " << total_affinity_only << endl;
-
-    // double total_overlap_score = 0.0;
-    for (int i = 0; i < batch_size; i++) {
-      total_overlap_score += (i+1) * overlaps[i] * 1.0;
-    }
-    total_overlap_score = total_overlap_score / totalActivated / batch_size;
-    cout << "Base Total Overlap score: " << total_overlap_score << endl;
-    
-    cout << "Base Iteration's overlap scores: " << endl;
-    for (int i = 0; i < overlap_scores.size(); i++) {
-      cout << overlap_scores[i] << " ";
-    }
-    cout << endl;
-    int maxElementIndex = std::max_element(overlap_scores.begin(),overlap_scores.end()) - overlap_scores.begin();
-    double maxElement = *std::max_element(overlap_scores.begin(), overlap_scores.end());
-    cout << "Base Max overlap score and iteration: " << maxElementIndex+1 << " " << maxElement << endl;
-
-  }
-
+  
 #ifdef OUTPUT 
   for (int i = 0; i < batch_size; i++) {
     long start = vecQueries[i];
     char outFileName[300];
-    sprintf(outFileName, "SSSP_base_output_src%ld.%ld.%ld.out", start, edge_count, batch_size);
+    sprintf(outFileName, "Heter_base_output_src%ld.%ld.%ld.out", start, edge_count, batch_size);
     FILE *fp;
     fp = fopen(outFileName, "w");
     for (long j = 0; j < n; j++)
@@ -556,7 +559,122 @@ void Compute_Heter_Base(graph<vertex>& G, std::vector<pair<long, benchmarkType>>
   pbbs::delete_array(QueryValues, totalNumVertices);
   pbbs::delete_array(CurrActiveArray, totalNumVertices);
   pbbs::delete_array(NextActiveArray, totalNumVertices);
-  pbbs::delete_array(overlaps, batch_size);
+
+}
+
+template <class vertex>
+void Compute_Heter_Skip(graph<vertex>& G, std::vector<pair<long, benchmarkType>> vecQueries, commandLine P, bool should_profile) {
+  size_t n = G.n;
+  size_t edge_count = G.m;
+  long batch_size = vecQueries.size();
+  IdxType totalNumVertices = (IdxType)n * (IdxType)batch_size;
+  intE* QueryValues = pbbs::new_array<intE>(totalNumVertices);
+  // benchmarkType* CurrActiveArray = pbbs::new_array<benchmarkType>(totalNumVertices);
+  // benchmarkType* NextActiveArray = pbbs::new_array<benchmarkType>(totalNumVertices);
+  bool* frontier = pbbs::new_array<bool>(n);
+  parallel_for(size_t i = 0; i < n; i++) {
+    frontier[i] = false;
+  }
+  for(long i = 0; i < batch_size; i++) {
+    frontier[vecQueries[i].first] = true;
+  }
+  // parallel_for(IdxType i = 0; i < totalNumVertices; i++) {
+  //   CurrActiveArray[i] = _empty;
+  //   NextActiveArray[i] = _empty;
+  // }
+  // parallel_for(IdxType i = 0; i < batch_size; i++) {
+  //   if (vecQueries[i].second & benchmark_sssp) {
+  //     CurrActiveArray[(IdxType)vecQueries[i].first * (IdxType)batch_size + (IdxType)i] = benchmark_sssp;
+  //   } else if (vecQueries[i].second & benchmark_bfs) {
+  //     CurrActiveArray[(IdxType)vecQueries[i].first * (IdxType)batch_size + (IdxType)i] = benchmark_bfs;
+  //   } else if (vecQueries[i].second & benchmark_sswp) {
+  //     CurrActiveArray[(IdxType)vecQueries[i].first * (IdxType)batch_size + (IdxType)i] = benchmark_sswp;
+  //   } else if (vecQueries[i].second & benchmark_ssnp) {
+  //     CurrActiveArray[(IdxType)vecQueries[i].first * (IdxType)batch_size + (IdxType)i] = benchmark_ssnp;
+  //   }
+  // }
+  for(long i = 0; i < batch_size; i++) {
+    if (vecQueries[i].second & benchmark_sssp) {
+      parallel_for(size_t j = 0; j < n; j++) {
+        QueryValues[j * batch_size + i] = (intE)MAXPATH;
+      }
+    } else if (vecQueries[i].second & benchmark_bfs) {
+      parallel_for(size_t j = 0; j < n; j++) {
+        QueryValues[j * batch_size + i] = (uintE)MAXLEVEL;
+      }
+    } else if (vecQueries[i].second & benchmark_sswp) {
+      parallel_for(size_t j = 0; j < n; j++) {
+        QueryValues[j * batch_size + i] = (intE)0;
+      }
+    } else if (vecQueries[i].second & benchmark_ssnp) {
+      parallel_for(size_t j = 0; j < n; j++) {
+        QueryValues[j * batch_size + i] = (intE)MAXWIDTH;
+      }
+    } 
+  }
+
+  for(size_t i = 0; i < batch_size; i++) {
+    if (vecQueries[i].second & benchmark_sssp) {
+      QueryValues[(IdxType)batch_size * (IdxType)vecQueries[i].first + (IdxType)i] = 0;
+    } else if (vecQueries[i].second & benchmark_bfs) {
+      QueryValues[(IdxType)batch_size * (IdxType)vecQueries[i].first + (IdxType)i] = 0;
+    } else if (vecQueries[i].second & benchmark_sswp) {
+      QueryValues[(IdxType)batch_size * (IdxType)vecQueries[i].first + (IdxType)i] = (intE)(MAXWIDTH);
+    } else if (vecQueries[i].second & benchmark_ssnp) {
+      QueryValues[(IdxType)batch_size * (IdxType)vecQueries[i].first + (IdxType)i] = (intE)0;
+    }
+  }
+
+  vertexSubset Frontier(n, frontier);
+
+  // for profiling
+  long iteration = 0;
+  size_t totalActivated = 0;
+
+  while(!Frontier.isEmpty()){
+    iteration++;
+    totalActivated += Frontier.size();
+    cout << iteration << endl;
+
+    // mode: no_dense, remove_duplicates (for batch size > 1)
+    vertexSubset output = edgeMap(G, Frontier, Heterogeneous_SKIP_F(QueryValues, batch_size), -1, no_dense|remove_duplicates);
+
+    Frontier.del();
+    Frontier = output;
+
+    Frontier.toDense();
+    // bool* new_d = Frontier.d;
+    // Frontier.d = nullptr;
+    // vertexSubset Frontier_new(n, new_d);
+    // Frontier.del();
+    // Frontier = Frontier_new;
+
+    // std::swap(CurrActiveArray, NextActiveArray);
+    // parallel_for(IdxType i = 0; i < totalNumVertices; i++) {
+    //   NextActiveArray[i] = false;
+    // }
+  }
+
+  // profiling
+  
+#ifdef OUTPUT 
+  for (int i = 0; i < batch_size; i++) {
+    long start = vecQueries[i];
+    char outFileName[300];
+    sprintf(outFileName, "Heter_base_output_src%ld.%ld.%ld.out", start, edge_count, batch_size);
+    FILE *fp;
+    fp = fopen(outFileName, "w");
+    for (long j = 0; j < n; j++)
+      fprintf(fp, "%ld %d\n", j, ShortestPathLen[j * batch_size + i]);
+    fclose(fp);
+  }
+#endif
+
+  Frontier.del();
+  pbbs::delete_array(QueryValues, totalNumVertices);
+  // pbbs::delete_array(CurrActiveArray, totalNumVertices);
+  // pbbs::delete_array(NextActiveArray, totalNumVertices);
+  // pbbs::delete_array(overlaps, batch_size);
 
 }
 

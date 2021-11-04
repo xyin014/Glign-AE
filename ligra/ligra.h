@@ -499,6 +499,8 @@ void Compute_Base(graph<vertex>&, vector<long>, commandLine, bool should_profile
 template<class vertex>
 void Compute_Heter_Base(graph<vertex>&, vector<pair<long, benchmarkType>>, commandLine, bool should_profile=false);
 template<class vertex>
+void Compute_Heter_Skip(graph<vertex>&, vector<pair<long, benchmarkType>>, commandLine, bool should_profile=false);
+template<class vertex>
 void Compute_Delay(graph<vertex>&, vector<long>, commandLine, vector<int>, bool should_profile=false);
 
 template<class vertex>
@@ -2789,15 +2791,15 @@ void bufferStreamingTypes(graph<vertex>& G, std::vector<pair<long, benchmarkType
     }
     cout << "check_sum: " << check_sum << endl;
 
-    if (should_profile) {
-      for (int i = 0; i < bufferedQueries.size(); i=i+bSize) {
-        std::vector<pair<long, benchmarkType>> tmpBatch;
-        for (int j = 0; j < bSize; j++) {
-          tmpBatch.push_back(bufferedQueries[i+j]);
-        }
-        Compute_Heter_Base(G,tmpBatch,P,true);
-      }
-    }
+    // if (should_profile) {
+    //   for (int i = 0; i < bufferedQueries.size(); i=i+bSize) {
+    //     std::vector<pair<long, benchmarkType>> tmpBatch;
+    //     for (int j = 0; j < bSize; j++) {
+    //       tmpBatch.push_back(bufferedQueries[i+j]);
+    //     }
+    //     Compute_Heter_Base(G,tmpBatch,P,true);
+    //   }
+    // }
 }
 
 // for reordering
@@ -2935,7 +2937,7 @@ void heter_reordering(int argc, char* argv[]) {
   cout << "query file name: " << queryFileName << endl;
 
   benchmarkType tmp_type;
-  benchmarkType qTypes[4] = {benchmark_sssp, benchmark_sswp, benchmark_ssnp, benchmark_bfs};
+  benchmarkType qTypes[2] = {benchmark_sssp, benchmark_bfs};
   srand((unsigned)time(NULL));
   // for (int t = 0; t < 32; t++) {
   //   int rnd_idx = rand() % 4;
@@ -2952,7 +2954,7 @@ void heter_reordering(int argc, char* argv[]) {
   sprintf(inFileName, queryFileName.c_str());
   inFile.open(inFileName, ios::in);
   while (inFile >> start) {
-    int rnd_idx = rand() % 4;
+    int rnd_idx = rand() % 2;
     benchmarkType tmp_type = qTypes[rnd_idx];
     // if (tmp_type & benchmark_sssp) {
     //   cout << " sssp\n";
@@ -2973,7 +2975,6 @@ void heter_reordering(int argc, char* argv[]) {
   // randomly shuffled each run
   std::random_device rd;
   auto rng = std::default_random_engine { rd() };
-  // auto rng = std::default_random_engine {};
   std::shuffle(std::begin(userQueries), std::end(userQueries), rng);
   cout << "number of random queries: " << userQueries.size() << endl;
 
