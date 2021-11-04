@@ -493,6 +493,8 @@ pair<size_t, size_t> Compute_Chunk(graph<vertex>&, vector<long>, set<set<long>>&
 template<class vertex>
 pair<size_t, size_t> Compute_Chunk_v2(graph<vertex>&, vector<long>, set<set<long>>&, commandLine, bool should_profile=false);
 template<class vertex>
+pair<size_t, size_t> Compute_Chunk_v3(graph<vertex>&, vector<long>, set<set<long>>&, commandLine, bool should_profile=false);
+template<class vertex>
 pair<size_t, size_t> Compute_Delay(graph<vertex>&, vector<long>, commandLine, vector<int>, bool should_profile=false);
 template<class vertex>
 pair<size_t, size_t> Compute_Delay_Skipping(graph<vertex>&, vector<long>, commandLine, vector<int>, bool should_profile=false);
@@ -500,6 +502,9 @@ template<class vertex>
 pair<size_t, size_t> Compute_Base_Skipping(graph<vertex>&, vector<long>, commandLine, int, bool should_profile=false);
 template<class vertex>
 pair<size_t, size_t> Compute_Base_Dynamic(graph<vertex>&, vector<long>, queue<long>&, commandLine, bool should_profile=false);
+template<class vertex>
+pair<size_t, size_t> Compute_Chunk_Concurrent(graph<vertex>&, vector<long>&, intE*, bool*, bool*, long, long, commandLine, bool should_profile=false);
+
 
 template<class vertex>
 void Compute(hypergraph<vertex>&, commandLine);
@@ -3047,7 +3052,7 @@ vector<pair<size_t, size_t>> bufferStreaming(graph<vertex>& G, std::vector<long>
 }
 
 template <class vertex>
-vector<pair<size_t, size_t>> streamingWithChunks(graph<vertex>& G, std::vector<long> bufferedQueries, set<set<long>>& C_Set, int bSize, commandLine P, bool should_profile=false) {
+vector<pair<size_t, size_t>> streamingWithChunks(graph<vertex>& G, std::vector<long> bufferedQueries, set<set<long>>& C_Set, vector<long>& chunk_lookup, int bSize, commandLine P, bool should_profile=false) {
     
     vector<set<long>> Tables;
     Tables.insert(Tables.end(), C_Set.begin(), C_Set.end());
@@ -3093,11 +3098,232 @@ vector<pair<size_t, size_t>> streamingWithChunks(graph<vertex>& G, std::vector<l
           tmpBatch.push_back(bufferedQueries[i+j]);
         }
         cout << "bufferedQueries " << bufferedQueries.size() << endl;
-        pair<size_t, size_t> share_cnt = Compute_Chunk_v2(G,tmpBatch,Tables, vtx2chunk, P,true);
+        pair<size_t, size_t> share_cnt = Compute_Chunk_v3(G,tmpBatch,Tables,chunk_lookup,vtx2chunk, P,true);
+        // pair<size_t, size_t> share_cnt = Compute_Chunk_v2(G,tmpBatch,Tables,vtx2chunk, P,true);
+
         cout << "finished batch\n ";
         res.push_back(share_cnt);
         // cout << share_cnt.first << " " << share_cnt.second << endl;
       }
+      t_t1.stop();
+      double time1 = t_t1.totalTime;
+      cout << "Profiling time: " << time1 << endl;
+    }
+    pbbs::delete_array(vtx2chunk, G.n);
+    return res;
+}
+
+template <class vertex>
+vector<pair<size_t, size_t>> streamingWithCGQ(graph<vertex>& G, std::vector<long> bufferedQueries, set<set<long>>& C_Set, vector<long>& chunk_lookup, int bSize, commandLine P, bool should_profile=false) {
+    
+    vector<set<long>> Tables;
+    Tables.insert(Tables.end(), C_Set.begin(), C_Set.end());
+    long chunk_size = Tables.size();
+    long* vtx2chunk = pbbs::new_array<long>(G.n);
+
+    parallel_for(long i = 0; i < chunk_size; i++) {
+      set<long> tmp_chunk = Tables[i];
+      // cout << "Chunk " << i << endl;
+      for (auto e : tmp_chunk) {
+        // cout << "\t " << e << endl;
+        vtx2chunk[e] = i;
+      }
+    }
+
+    timer start_time1; start_time1.start();
+    for (int i = 0; i < bufferedQueries.size(); i=i+bSize) {
+      // cout << "i: " << i << endl;
+      std::vector<long> tmpBatch;
+      for (int j = 0; j < bSize; j++) {
+        tmpBatch.push_back(bufferedQueries[i+j]);
+      }
+      
+      timer t_t1;
+      t_t1.start();
+      if (bSize != 1)
+        // Compute_Base(G,tmpBatch,P);
+      t_t1.stop();
+      double time1 = t_t1.totalTime;   
+    }
+    start_time1.stop();
+    double query_time1 = start_time1.totalTime;
+
+    vector<pair<size_t, size_t>> res;
+    long n = G.n;
+    if (should_profile) {
+      timer t_t1;
+      t_t1.start();
+      std::vector<long> tmpBatch;
+      for (int i = 0; i < bufferedQueries.size(); i=i+bSize) {
+        for (int j = 0; j < bSize; j++) {
+          tmpBatch.push_back(bufferedQueries[i+j]);
+        }
+        {parallel_for (int j = 0; j < bSize; j++) {
+          std::vector<long> tmpBatch;
+          tmpBatch.push_back(bufferedQueries[i+j]);
+          Compute_Base_Skipping(G,tmpBatch, P,0);
+        }}
+        cout << "finished concurrent queries\n ";
+      }
+      t_t1.stop();
+      double time1 = t_t1.totalTime;
+      cout << "Profiling time: " << time1 << endl;
+    }
+    pbbs::delete_array(vtx2chunk, G.n);
+    return res;
+}
+
+template <class vertex>
+vector<pair<size_t, size_t>> streamingWithCGQ_Chunk(graph<vertex>& G, std::vector<long> bufferedQueries, set<set<long>>& C_Set, vector<long>& chunk_lookup, int bSize, commandLine P, bool should_profile=false) {
+    
+    vector<set<long>> Tables;
+    Tables.insert(Tables.end(), C_Set.begin(), C_Set.end());
+    long chunk_size = Tables.size();
+    long* vtx2chunk = pbbs::new_array<long>(G.n);
+
+    parallel_for(long i = 0; i < chunk_size; i++) {
+      set<long> tmp_chunk = Tables[i];
+      // cout << "Chunk " << i << endl;
+      for (auto e : tmp_chunk) {
+        // cout << "\t " << e << endl;
+        vtx2chunk[e] = i;
+      }
+    }
+
+    timer start_time1; start_time1.start();
+    for (int i = 0; i < bufferedQueries.size(); i=i+bSize) {
+      // cout << "i: " << i << endl;
+      std::vector<long> tmpBatch;
+      for (int j = 0; j < bSize; j++) {
+        tmpBatch.push_back(bufferedQueries[i+j]);
+      }
+      
+      timer t_t1;
+      t_t1.start();
+      if (bSize != 1)
+        // Compute_Base(G,tmpBatch,P);
+      t_t1.stop();
+      double time1 = t_t1.totalTime;   
+    }
+    start_time1.stop();
+    double query_time1 = start_time1.totalTime;
+
+    vector<pair<size_t, size_t>> res;
+    long n = G.n;
+    if (should_profile) {
+      timer t_t1;
+      t_t1.start();
+      std::vector<long> tmpBatch;
+      for (int i = 0; i < bufferedQueries.size(); i=i+bSize) {
+        for (int j = 0; j < bSize; j++) {
+          tmpBatch.push_back(bufferedQueries[i+j]);
+        }
+        // prepare vtx data arrays.
+        // prepare the chunk to be processed for each
+        // each chunk has: start index, end index, 
+        
+        vector<intE*> vtxVals(bSize, nullptr);
+        vector<bool*> Frontiers(bSize, nullptr);
+        
+        vector<bool*> currFrontier(bSize, nullptr);
+        for (int bb = 0; bb < tmpBatch.size(); bb++) {
+          // initialization of queries.
+          vtxVals[bb] = pbbs::new_array<intE>(n);
+          Frontiers[bb] = pbbs::new_array<bool>(n);
+          // nextFrontier[bb] = pbbs::new_array<bool>(n);
+          // currFrontier[bb] = pbbs::new_array<bool>(n);
+          parallel_for(size_t vid = 0; vid < n; vid++) {
+            Frontiers[bb][vid] = false;
+            // nextFrontier[bb][vid] = false;
+            vtxVals[bb][vid] = (intE)MAXPATH; // for SSSP only
+          }
+          Frontiers[bb][tmpBatch[bb]] = true;
+          vtxVals[bb][tmpBatch[bb]] = 0;
+        }
+
+        // long cur_cid = chunk_lookup.size();
+        cout << "start querying\n";
+        while (true) {
+
+          vector<bool*> nextFrontier(bSize, nullptr);
+          for (int bb = 0; bb < tmpBatch.size(); bb++) {
+            nextFrontier[bb] = pbbs::new_array<bool>(n);
+            parallel_for(size_t vid = 0; vid < n; vid++) {
+              nextFrontier[bb][vid] = false;
+            }
+          }
+          for (long cid = 0; cid < chunk_lookup.size()+1; cid++) {
+            for (int bb = 0; bb < tmpBatch.size(); bb++) {
+              currFrontier[bb] = pbbs::new_array<bool>(n);
+              parallel_for(long vid = 0; vid < n; vid++) {
+                currFrontier[bb][vid] = false;
+              }
+            }
+            
+            long tmp_bound = chunk_lookup[cid];
+            long pre_bound = 0;
+            if (cid == 0) {
+              pre_bound = 0;
+            } else {
+              pre_bound = chunk_lookup[cid-1];
+            }
+            if (cid == chunk_lookup.size()) {
+              tmp_bound = n;
+            }
+            
+            parallel_for(long j = pre_bound; j < tmp_bound; j++) {
+              for (int bb = 0; bb < tmpBatch.size(); bb++) {
+                if (Frontiers[bb][j]) {
+                  currFrontier[bb][j] = true;
+                }
+              }
+            }
+            
+            cout << "before concurrent queries...cid: " << cid << endl;;
+            {parallel_for(int q = 0; q < bSize; q++) {
+              vector<long> singleQ;
+              singleQ.push_back(tmpBatch[q]);
+              // ret: (F array, F.size()) 
+              Compute_Chunk_Concurrent(G, singleQ, vtxVals[q], currFrontier[q], nextFrontier[q], pre_bound, tmp_bound, P);
+            }}
+            cout << "after concurrent queries...\n";
+          } // end chunk_lookup loop
+
+          vector<long> F_new_size(bSize);
+          long sum_size = 0;
+          for (int bb = 0; bb < bSize; bb++) {
+            vertexSubset tmp_Frontier(n, nextFrontier[bb]);
+            F_new_size[bb] = tmp_Frontier.size();
+            sum_size += tmp_Frontier.size();
+            tmp_Frontier.toDense();
+            nextFrontier[bb] = tmp_Frontier.d;
+          }
+          cout << "sum_size: " << sum_size << endl;
+          if (sum_size == 0) break;
+          for (int bb = 0; bb < bSize; bb++) {
+            bool* tmp = Frontiers[bb];
+            Frontiers[bb] = nextFrontier[bb];
+            pbbs::delete_array(tmp, n);
+          }
+        }
+        
+        cout << "finished concurrent queries\n ";
+
+        #ifdef OUTPUT 
+          for (int bb = 0; bb < bSize; bb++) {
+            long start = tmpBatch[bb];
+            char outFileName[300];
+            sprintf(outFileName, "SSSP_concurrent_chunk_output_src%ld.%ld.out", start, bSize);
+            FILE *fp;
+            fp = fopen(outFileName, "w");
+            for (long j = 0; j < n; j++)
+              fprintf(fp, "%ld %d\n", j, vtxVals[bb][j]);
+            fclose(fp);
+          }
+        #endif
+      }
+
+      
       t_t1.stop();
       double time1 = t_t1.totalTime;
       cout << "Profiling time: " << time1 << endl;
@@ -3685,6 +3911,7 @@ void test_graphM_Chunk(int argc, char* argv[]) {
     vector<pair<size_t,size_t>> share_unsorted;
     vector<pair<size_t,size_t>> share_sorted;
 
+    
     size_t cache_size = 8 * 1024l * 1024l; // in MB
     size_t graph_size = 694 * 1024l * 1024l; // in MB
     size_t vtx_data_size = sizeof(long) * G.n;
@@ -3707,22 +3934,52 @@ void test_graphM_Chunk(int argc, char* argv[]) {
     }
     std::sort(vIDDegreePairs.begin(), vIDDegreePairs.end(), sortByLargerSecondElement);
 
+    // // chunking based on the order of degrees of vertices
+    // long tmp_num_edges = 0;
+    // vector<long> tmp_c_table;
+    // for (long idx = 0; idx < vIDDegreePairs.size(); idx++) {
+    //   long src = vIDDegreePairs[idx].first;
+    //   long deg = vIDDegreePairs[idx].second;
+    //   if (tmp_num_edges + deg <= test_size) {
+    //     // insert into chunk
+    //     tmp_c_table.push_back(src);
+    //     tmp_num_edges += deg;
+    //   } else {
+    //     // store the chunk
+    //     C_Set.insert(set<long>(tmp_c_table.begin(), tmp_c_table.end()));
+    //     tmp_num_edges = 0;
+    //     tmp_c_table.clear();
+    //     tmp_c_table.push_back(src);
+    //     tmp_num_edges += deg;
+    //   }
+    // }
+    // if (tmp_num_edges > 0 && !tmp_c_table.empty()) {
+    //   C_Set.insert(set<long>(tmp_c_table.begin(), tmp_c_table.end()));
+    //   tmp_num_edges = 0;
+    //   tmp_c_table.clear();
+    // }
+    // cout << "Num of Chunks: " << C_Set.size() << endl;
+
+
+    // chunking based on the vertex ID. To make them consecutive. 
+    vector<long> chunk_lookup;
     long tmp_num_edges = 0;
     vector<long> tmp_c_table;
-    for (long idx = 0; idx < vIDDegreePairs.size(); idx++) {
-      long src = vIDDegreePairs[idx].first;
-      long deg = vIDDegreePairs[idx].second;
+    for (long idx = 0; idx < n; idx++) {
+      long deg =  G.V[idx].getOutDegree();
       if (tmp_num_edges + deg <= test_size) {
         // insert into chunk
-        tmp_c_table.push_back(src);
+        tmp_c_table.push_back(idx);
         tmp_num_edges += deg;
       } else {
         // store the chunk
         C_Set.insert(set<long>(tmp_c_table.begin(), tmp_c_table.end()));
         tmp_num_edges = 0;
         tmp_c_table.clear();
-        tmp_c_table.push_back(src);
+        tmp_c_table.push_back(idx);
         tmp_num_edges += deg;
+        // vtxs before this point are belonging to the current chunk
+        chunk_lookup.push_back(idx); 
       }
     }
     if (tmp_num_edges > 0 && !tmp_c_table.empty()) {
@@ -3731,25 +3988,207 @@ void test_graphM_Chunk(int argc, char* argv[]) {
       tmp_c_table.clear();
     }
     cout << "Num of Chunks: " << C_Set.size() << endl;
-    // for (auto e : C_Set) {
-    //   cout << "chunk vtx count: " << e.size() << endl;
-    //   for (auto x : e) {
-    //     cout << "\t " << x << endl;
-    //   }
-    // }
+    cout << "size of the lookup table: " << chunk_lookup.size() << endl;
+
 
     if (selection == 1) {
       cout << "\nsequential evaluation..\n";
-      share1 = streamingWithChunks(G, truncatedQueries, C_Set, 1, P, true);
+      share1 = streamingWithChunks(G, truncatedQueries, C_Set, chunk_lookup, 1, P, true);
     }
     if (selection == 2) {
       cout << "\non the unsorted buffer..\n";
-      share_unsorted = streamingWithChunks(G, truncatedQueries, C_Set, bSize, P, true);
+      share_unsorted = streamingWithChunks(G, truncatedQueries, C_Set, chunk_lookup, bSize, P, true);
     }
     // // if (selection == 3) {
     //   cout << "\non the sorted buffer..\n";
     //   share_sorted = asyncStreaming(G, sortedQueries, bSize, P, true);
     // // }
+
+    // vector<size_t> total_N;
+    // size_t temp = 0;
+    // for (int i = 0; i < combination_max; i++) {
+    //   temp += share1[i].first;
+    // }
+    // total_N.push_back(temp);
+
+    // double share_ratio_unsorted = 0.0;
+    // double share_ratio_sorted = 0.0;
+    // cout << "size: " << total_N.size() << endl;
+    // for (int i = 0; i < total_N.size(); i++) {
+    //   cout << i << endl;
+    //   size_t denominator = total_N[i];
+    //   size_t nominator_unsorted = share_unsorted[i].first;
+    //   size_t nominator_sorted = share_sorted[i].first;
+    //   cout << nominator_unsorted << " " << nominator_sorted << " " << denominator << endl;
+    //   cout << 1- 1.0*nominator_unsorted / denominator << " " << 1- 1.0*nominator_sorted / denominator << endl;
+    //   share_ratio_unsorted += (1 - 1.0*nominator_unsorted / denominator);
+    //   share_ratio_sorted += (1 - 1.0*nominator_sorted / denominator);
+    // }
+    // cout << "unsorted average sharing ratio: " << share_ratio_unsorted/total_N.size() << endl;
+    // cout << "sorted average sharing ratio: " << share_ratio_sorted/total_N.size() << endl;
+  }
+}
+
+// for testing graphM with chunks
+void test_cgq(int argc, char* argv[]) {
+  commandLine P(argc,argv," [-s] <inFile>");
+  char* iFile = P.getArgument(0);
+  bool symmetric = P.getOptionValue("-s");
+  bool compressed = P.getOptionValue("-c");
+  bool binary = P.getOptionValue("-b");
+  bool mmap = P.getOptionValue("-m");
+  //cout << "mmap = " << mmap << endl;
+  long rounds = P.getOptionLongValue("-rounds",1);
+
+  string queryFileName = string(P.getOptionValue("-qf", ""));
+  int combination_max = P.getOptionLongValue("-max_combination", 256);
+  size_t bSize = P.getOptionLongValue("-batch", 4);
+  size_t n_high_deg = P.getOptionLongValue("-nhighdeg", 4);
+
+  cout << "graph file name: " << iFile << endl;
+  cout << "query file name: " << queryFileName << endl;
+
+  // Initialization and preprocessing
+  std::vector<long> userQueries; 
+  long start = -1;
+  char inFileName[300];
+  ifstream inFile;
+  sprintf(inFileName, queryFileName.c_str());
+  inFile.open(inFileName, ios::in);
+  while (inFile >> start) {
+    userQueries.push_back(start);
+  }
+  inFile.close();
+  // randomly shuffled each run
+  std::random_device rd;
+  auto rng = std::default_random_engine { rd() };
+  // auto rng = std::default_random_engine {};
+  std::shuffle(std::begin(userQueries), std::end(userQueries), rng);
+  cout << "number of random queries: " << userQueries.size() << endl;
+
+  int setSize = userQueries.size();
+  std::vector<long> testQuery[setSize];
+
+  if (symmetric) {
+    cout << "symmetric graph\n";
+    // graph<symmetricVertex> G =
+    //   readGraph<symmetricVertex>(iFile,compressed,symmetric,binary,mmap); //symmetric graph
+    // // for(int r=0;r<rounds;r++) {
+    // cout << "n=" << G.n << " m=" << G.m << endl;
+
+    // // Streaming...
+    // vector<long> sortedQueries;
+    // vector<long> truncatedQueries;
+    // vector<long> propertySortedQueries;
+    // tie(truncatedQueries, sortedQueries) = streamingPreprocessing(G, userQueries, n_high_deg, combination_max, P);
+    
+    // // start streaming.
+    // // input: G, P, bufferedQueries, batch size
+    // long selection = P.getOptionLongValue("-order",1);
+    // // if (selection == 1) {
+    // //   cout << "\nsequential evaluation..\n";
+    // //   bufferStreaming(G, truncatedQueries, 1, P);
+    // // }
+    // // if (selection == 2) {
+    // //   cout << "\non the unsorted buffer..\n";
+    // //   bufferStreaming(G, truncatedQueries, bSize, P, true);
+    // // }
+    // // if (selection == 3) {
+    // //   cout << "\non the sorted buffer..\n";
+    // //   bufferStreaming(G, sortedQueries, bSize, P, true);
+    // // }
+    // // if (selection == 4) {
+    // //   cout << "\non the property-based sorted buffer..\n";
+    // //   propertySortedQueries = reorderingByProperty(G, truncatedQueries, n_high_deg, P);
+    // //   bufferStreaming(G, propertySortedQueries, bSize, P, true);
+    // // }
+
+  } else {
+    // For directed graph...
+    cout << "asymmetric graph\n";
+    graph<asymmetricVertex> G =
+      readGraph<asymmetricVertex>(iFile,compressed,symmetric,binary,mmap); //asymmetric graph
+    cout << "n=" << G.n << " m=" << G.m << endl;
+    
+    // Streaming...
+    vector<long> sortedQueries;
+    vector<long> truncatedQueries;
+    vector<long> propertySortedQueries;
+    tie(truncatedQueries, sortedQueries) = streamingPreprocessing(G, userQueries, n_high_deg, combination_max, P);
+    
+    // start streaming.
+    // input: G, P, bufferedQueries, batch size
+    long selection = P.getOptionLongValue("-order",1);
+    vector<pair<size_t,size_t>> share1;
+    vector<pair<size_t,size_t>> share_unsorted;
+    vector<pair<size_t,size_t>> share_sorted;
+
+    
+    size_t cache_size = 8 * 1024l * 1024l; // in MB
+    size_t graph_size = 694 * 1024l * 1024l; // in MB
+    size_t vtx_data_size = sizeof(long) * G.n;
+    long chunk_size = 0;
+    long tmp_block = cache_size / (1.0 + (1.0*vtx_data_size) / graph_size);
+    chunk_size = tmp_block / 16; // hardware concurrency
+    // long test_size = G.m * chunk_size / graph_size;
+    cout << G.m * chunk_size / graph_size << endl;
+    long edges_per_chunk = P.getOptionLongValue("-chunk_edge",960000l);
+    long test_size = edges_per_chunk;
+    cout << "chunk_size: " << chunk_size << ", num of edges: " << test_size << endl;
+    set<set<long>> C_Set;
+    set<long> c_table;
+
+    size_t n = G.n;
+    std::vector<std::pair<long, long>> vIDDegreePairs;
+    for (long i = 0; i < n; i++) {
+      long temp_degree =  G.V[i].getOutDegree();
+      vIDDegreePairs.push_back(std::make_pair(i, temp_degree));
+    }
+    std::sort(vIDDegreePairs.begin(), vIDDegreePairs.end(), sortByLargerSecondElement);
+    
+    // chunking based on the vertex ID. To make them consecutive. 
+    vector<long> chunk_lookup;
+    long tmp_num_edges = 0;
+    vector<long> tmp_c_table;
+    for (long idx = 0; idx < n; idx++) {
+      long deg =  G.V[idx].getOutDegree();
+      if (tmp_num_edges + deg <= test_size) {
+        // insert into chunk
+        tmp_c_table.push_back(idx);
+        tmp_num_edges += deg;
+      } else {
+        // store the chunk
+        C_Set.insert(set<long>(tmp_c_table.begin(), tmp_c_table.end()));
+        tmp_num_edges = 0;
+        tmp_c_table.clear();
+        tmp_c_table.push_back(idx);
+        tmp_num_edges += deg;
+        // vtxs before this point are belonging to the current chunk
+        chunk_lookup.push_back(idx); 
+      }
+    }
+    if (tmp_num_edges > 0 && !tmp_c_table.empty()) {
+      C_Set.insert(set<long>(tmp_c_table.begin(), tmp_c_table.end()));
+      tmp_num_edges = 0;
+      tmp_c_table.clear();
+    }
+    cout << "Num of Chunks: " << C_Set.size() << endl;
+    cout << "size of the lookup table: " << chunk_lookup.size() << endl;
+
+
+    // if (selection == 1) {
+    //   cout << "\nsequential evaluation..\n";
+    //   share1 = bufferStreamingSkipping(G, truncatedQueries, C_Set, chunk_lookup, 1, P, true);
+    // }
+    if (selection == 2) {
+      cout << "\non the concurrent setting..\n";
+      share_unsorted = streamingWithCGQ(G, truncatedQueries, C_Set, chunk_lookup, bSize, P, true);
+    }
+
+    if (selection == 3) {
+      cout << "\non the concurrent setting with chunks..\n";
+      share_unsorted = streamingWithCGQ_Chunk(G, truncatedQueries, C_Set, chunk_lookup, bSize, P, true);
+    }
 
     // vector<size_t> total_N;
     // size_t temp = 0;
@@ -4836,12 +5275,18 @@ int parallel_main(int argc, char* argv[]) {
 
   if (options == "graphM") {
     cout << "testing the scenario similar to graphM\n";
+    // insert the batch when there is an empty slot.
     test_graphM(argc, argv);
   }
 
   if (options == "chunk") {
     cout << "testing graph partitions similar to graphM (CGraph).\n";
     test_graphM_Chunk(argc, argv);
+  }
+
+  if (options == "cgq") {
+    cout << "testing concurrent query processing on Ligra.\n";
+    test_cgq(argc, argv);
   }
 }
 #endif
