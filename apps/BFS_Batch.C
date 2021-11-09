@@ -322,8 +322,6 @@ pair<size_t, size_t> Compute_Base_Skipping(graph<vertex>& G, std::vector<long> v
   long batch_size = vecQueries.size();
   IdxType totalNumVertices = (IdxType)n * (IdxType)batch_size;
   uintE* Levels = pbbs::new_array<uintE>(totalNumVertices);
-  bool* CurrActiveArray = pbbs::new_array<bool>(totalNumVertices);
-  bool* NextActiveArray = pbbs::new_array<bool>(totalNumVertices);
   bool* frontier = pbbs::new_array<bool>(n);
   parallel_for(size_t i = 0; i < n; i++) {
     frontier[i] = false;
@@ -333,14 +331,9 @@ pair<size_t, size_t> Compute_Base_Skipping(graph<vertex>& G, std::vector<long> v
   }
   parallel_for(IdxType i = 0; i < totalNumVertices; i++) {
     Levels[i] = (uintE)MAXLEVEL;
-    CurrActiveArray[i] = false;
-    NextActiveArray[i] = false;
   }
   for(long i = 0; i < batch_size; i++) {
     Levels[(IdxType)batch_size * (IdxType)vecQueries[i] + (IdxType)i] = 0;
-  }
-  parallel_for(size_t i = 0; i < batch_size; i++) {
-    CurrActiveArray[(IdxType)vecQueries[i] * (IdxType)batch_size + (IdxType)i] = true;
   }
 
   vertexSubset Frontier(n, frontier);
@@ -368,11 +361,6 @@ pair<size_t, size_t> Compute_Base_Skipping(graph<vertex>& G, std::vector<long> v
 
   }
 
-  // profiling
-  if (should_profile) {
-    
-  }
-
 #ifdef OUTPUT 
   for (int i = 0; i < batch_size; i++) {
     long start = vecQueries[i];
@@ -387,8 +375,6 @@ pair<size_t, size_t> Compute_Base_Skipping(graph<vertex>& G, std::vector<long> v
 #endif
 
   Frontier.del();
-  pbbs::delete_array(CurrActiveArray, totalNumVertices);
-  pbbs::delete_array(NextActiveArray, totalNumVertices);
   pbbs::delete_array(Levels, totalNumVertices);
   return make_pair(totalActivated, 0);
 }
@@ -644,8 +630,6 @@ pair<size_t, size_t> Compute_Delay_Skipping(graph<vertex>& G, std::vector<long> 
   long batch_size = vecQueries.size();
   IdxType totalNumVertices = (IdxType)n * (IdxType)batch_size;
   uintE* Levels = pbbs::new_array<uintE>(totalNumVertices);
-  bool* CurrActiveArray = pbbs::new_array<bool>(totalNumVertices);
-  bool* NextActiveArray = pbbs::new_array<bool>(totalNumVertices);
   bool* frontier = pbbs::new_array<bool>(n);
   parallel_for(size_t i = 0; i < n; i++) {
     frontier[i] = false;
@@ -659,16 +643,9 @@ pair<size_t, size_t> Compute_Delay_Skipping(graph<vertex>& G, std::vector<long> 
 
   parallel_for(IdxType i = 0; i < totalNumVertices; i++) {
     Levels[i] = (uintE)MAXLEVEL;
-    CurrActiveArray[i] = false;
-    NextActiveArray[i] = false;
   }
   for(long i = 0; i < batch_size; i++) {
     Levels[(IdxType)batch_size * (IdxType)vecQueries[i] + (IdxType)i] = 0;
-  }
-  parallel_for(size_t i = 0; i < batch_size; i++) {
-    if (defer_vec[i] == 0 || defer_vec[i] > 1000) {
-      CurrActiveArray[(IdxType)vecQueries[i] * (IdxType)batch_size + (IdxType)i] = true;
-    }
   }
 
   vertexSubset Frontier(n, frontier);
@@ -680,7 +657,6 @@ pair<size_t, size_t> Compute_Delay_Skipping(graph<vertex>& G, std::vector<long> 
   while(!Frontier.isEmpty()){
     iteration++;
     totalActivated += Frontier.size();
-
     // mode: no_dense, remove_duplicates (for batch size > 1)
     vertexSubset output = edgeMap(G, Frontier, BFSLV_SKIP_F(Levels, batch_size), -1, no_dense|remove_duplicates);
 
@@ -693,21 +669,18 @@ pair<size_t, size_t> Compute_Delay_Skipping(graph<vertex>& G, std::vector<long> 
     for(long i = 0; i < batch_size; i++) {
       if (defer_vec[i] == iteration) {
         new_d[vecQueries[i]] = true;
-        NextActiveArray[(IdxType)vecQueries[i] * (IdxType)batch_size + (IdxType)i] = true;
       } 
     }
     vertexSubset Frontier_new(n, new_d);
     Frontier.del();
     Frontier = Frontier_new;
-    // t_checking.stop();
-    // t_checking.reportTotal("checking delaying");
   }
 
 #ifdef OUTPUT 
   for (int i = 0; i < batch_size; i++) {
     long start = vecQueries[i];
     char outFileName[300];
-    sprintf(outFileName, "BFSLV_delay_output_src%ld.%ld.%ld.out", start, edge_count, batch_size);
+    sprintf(outFileName, "BFSLV_delay_skipping_output_src%ld.%ld.%ld.out", start, edge_count, batch_size);
     FILE *fp;
     fp = fopen(outFileName, "w");
     for (long j = 0; j < n; j++)
@@ -717,8 +690,6 @@ pair<size_t, size_t> Compute_Delay_Skipping(graph<vertex>& G, std::vector<long> 
 #endif
 
   Frontier.del();
-  pbbs::delete_array(CurrActiveArray, totalNumVertices);
-  pbbs::delete_array(NextActiveArray, totalNumVertices);
   pbbs::delete_array(Levels, totalNumVertices);
   return make_pair(totalActivated, 0);
 }

@@ -1119,7 +1119,7 @@ pair<size_t, size_t> Compute_Base_Skipping(graph<vertex>& G, std::vector<long> v
   while(!Frontier.isEmpty()){
     iteration++;
     totalActivated += Frontier.size();
-Frontier.toDense();
+// Frontier.toDense();
     // mode: no_dense, remove_duplicates (for batch size > 1)
     if (iteration > skipIter) {
       vertexSubset output = edgeMap(G, Frontier, DJ_SKIP_F(ShortestPathLen, CurrActiveArray, NextActiveArray, batch_size), -1, no_dense|remove_duplicates);

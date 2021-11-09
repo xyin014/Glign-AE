@@ -74,12 +74,10 @@ struct DJ_F {
 
 struct DJ_SKIP_F {
   intE* ShortestPathLen;
-  bool* CurrActiveArray;
-  bool* NextActiveArray;
   long BatchSize;
 
-  DJ_SKIP_F(intE* _ShortestPathLen, bool* _CurrActiveArray, bool* _NextActiveArray, long _BatchSize) : 
-    ShortestPathLen(_ShortestPathLen), CurrActiveArray(_CurrActiveArray), NextActiveArray(_NextActiveArray), BatchSize(_BatchSize) {}
+  DJ_SKIP_F(intE* _ShortestPathLen, long _BatchSize) : 
+    ShortestPathLen(_ShortestPathLen), BatchSize(_BatchSize) {}
   
   inline bool update (uintE s, uintE d, intE edgeLen) { //Update
     bool ret = false;
@@ -552,8 +550,6 @@ pair<size_t, size_t> Compute_Base_Skipping(graph<vertex>& G, std::vector<long> v
   long batch_size = vecQueries.size();
   IdxType totalNumVertices = (IdxType)n * (IdxType)batch_size;
   intE* ShortestPathLen = pbbs::new_array<intE>(totalNumVertices);
-  bool* CurrActiveArray = pbbs::new_array<bool>(totalNumVertices);
-  bool* NextActiveArray = pbbs::new_array<bool>(totalNumVertices);
   bool* frontier = pbbs::new_array<bool>(n);
   parallel_for(size_t i = 0; i < n; i++) {
     frontier[i] = false;
@@ -563,14 +559,9 @@ pair<size_t, size_t> Compute_Base_Skipping(graph<vertex>& G, std::vector<long> v
   }
   parallel_for(IdxType i = 0; i < totalNumVertices; i++) {
     ShortestPathLen[i] = (intE)MAXPATH;
-    CurrActiveArray[i] = false;
-    NextActiveArray[i] = false;
   }
   for(long i = 0; i < batch_size; i++) {
     ShortestPathLen[(IdxType)batch_size * (IdxType)vecQueries[i] + (IdxType)i] = 0;
-  }
-  for(size_t i = 0; i < batch_size; i++) {
-    CurrActiveArray[(IdxType)vecQueries[i] * (IdxType)batch_size + (IdxType)i] = true;
   }
 
   vertexSubset Frontier(n, frontier);
@@ -580,23 +571,13 @@ pair<size_t, size_t> Compute_Base_Skipping(graph<vertex>& G, std::vector<long> v
   size_t totalActivated = 0;
   size_t totalNoOverlap = 0;
 
-  // vector<long> frontier_iterations;
-  // vector<long> overlapped_iterations;
-  // vector<long> accumulated_overlapped_iterations;
-  // vector<long> total_activated_iterations;
-
   while(!Frontier.isEmpty()){
     iteration++;
     totalActivated += Frontier.size();
 
-    // profiling
-    if (should_profile) {
-      
-    }
-
     // mode: no_dense, remove_duplicates (for batch size > 1)
     if (iteration > skipIter) {
-      vertexSubset output = edgeMap(G, Frontier, DJ_SKIP_F(ShortestPathLen, CurrActiveArray, NextActiveArray, batch_size), -1, no_dense|remove_duplicates);
+      vertexSubset output = edgeMap(G, Frontier, DJ_SKIP_F(ShortestPathLen, batch_size), -1, no_dense|remove_duplicates);
       Frontier.del();
       Frontier = output;
 
@@ -606,30 +587,7 @@ pair<size_t, size_t> Compute_Base_Skipping(graph<vertex>& G, std::vector<long> v
       vertexSubset Frontier_new(n, new_d);
       Frontier.del();
       Frontier = Frontier_new;
-    } else {
-      vertexSubset output = edgeMap(G, Frontier, DJ_F(ShortestPathLen, CurrActiveArray, NextActiveArray, batch_size), -1, no_dense|remove_duplicates);
-      Frontier.del();
-      Frontier = output;
-      
-      Frontier.toDense();
-      bool* new_d = Frontier.d;
-      Frontier.d = nullptr;
-      vertexSubset Frontier_new(n, new_d);
-      Frontier.del();
-      Frontier = Frontier_new;
-
-      std::swap(CurrActiveArray, NextActiveArray);
-      parallel_for(IdxType i = 0; i < totalNumVertices; i++) {
-        NextActiveArray[i] = false;
-      }
     }
-
-    // Frontier.toDense();
-    // bool* new_d = Frontier.d;
-    // Frontier.d = nullptr;
-    // vertexSubset Frontier_new(n, new_d);
-    // Frontier.del();
-    // Frontier = Frontier_new;
   }
 
 
@@ -648,8 +606,6 @@ pair<size_t, size_t> Compute_Base_Skipping(graph<vertex>& G, std::vector<long> v
 
   Frontier.del();
   pbbs::delete_array(ShortestPathLen, totalNumVertices);
-  pbbs::delete_array(CurrActiveArray, totalNumVertices);
-  pbbs::delete_array(NextActiveArray, totalNumVertices);
   return make_pair(totalActivated, totalNoOverlap);
 }
 
@@ -764,8 +720,6 @@ pair<size_t, size_t> Compute_Delay_Skipping(graph<vertex>& G, std::vector<long> 
   long batch_size = vecQueries.size();
   IdxType totalNumVertices = (IdxType)n * (IdxType)batch_size;
   intE* ShortestPathLen = pbbs::new_array<intE>(totalNumVertices);
-  bool* CurrActiveArray = pbbs::new_array<bool>(totalNumVertices);
-  bool* NextActiveArray = pbbs::new_array<bool>(totalNumVertices);
   bool* frontier = pbbs::new_array<bool>(n);
   parallel_for(size_t i = 0; i < n; i++) {
     frontier[i] = false;
@@ -781,16 +735,9 @@ pair<size_t, size_t> Compute_Delay_Skipping(graph<vertex>& G, std::vector<long> 
   // }
   parallel_for(IdxType i = 0; i < totalNumVertices; i++) {
     ShortestPathLen[i] = (intE)MAXPATH;
-    CurrActiveArray[i] = false;
-    NextActiveArray[i] = false;
   }
   for(long i = 0; i < batch_size; i++) {
     ShortestPathLen[(IdxType)batch_size * (IdxType)vecQueries[i] + (IdxType)i] = 0;
-  }
-  for(size_t i = 0; i < batch_size; i++) {
-    if (defer_vec[i] == 0) {
-      CurrActiveArray[(IdxType)vecQueries[i] * (IdxType)batch_size + (IdxType)i] = true;
-    }
   }
 
   vertexSubset Frontier(n, frontier);
@@ -799,34 +746,15 @@ pair<size_t, size_t> Compute_Delay_Skipping(graph<vertex>& G, std::vector<long> 
   long iteration = 0;
   size_t totalActivated = 0;
 
-  // vector<long> frontier_iterations;
-  // vector<long> overlapped_iterations;
-  // vector<long> accumulated_overlapped_iterations;
-  // vector<long> total_activated_iterations;
-
   while(!Frontier.isEmpty()){
     iteration++;
     totalActivated += Frontier.size();
 
-    // profiling
-    if (should_profile) {
-    }
-
     // mode: no_dense, remove_duplicates (for batch size > 1)
-    vertexSubset output = edgeMap(G, Frontier, DJ_SKIP_F(ShortestPathLen, CurrActiveArray, NextActiveArray, batch_size), -1, no_dense|remove_duplicates);
+    vertexSubset output = edgeMap(G, Frontier, DJ_SKIP_F(ShortestPathLen, batch_size), -1, no_dense|remove_duplicates);
     Frontier.del();
     Frontier = output;
     
-    // Checking for delayed queries.
-    // TODO: possibly optimization.
-    // timer t_checking;
-    // t_checking.start();
-    // Frontier.toDense();
-    // bool* new_d = pbbs::new_array<bool>(n);
-    // parallel_for(size_t i = 0; i < n; i++) {
-    //   new_d[i] = Frontier.d[i];
-    // }
-
     Frontier.toDense();
     bool* new_d = Frontier.d;
     Frontier.d = nullptr;
@@ -839,12 +767,6 @@ pair<size_t, size_t> Compute_Delay_Skipping(graph<vertex>& G, std::vector<long> 
     vertexSubset Frontier_new(n, new_d);
     Frontier.del();
     Frontier = Frontier_new;
-    // t_checking.stop();
-    // t_checking.reportTotal("checking delaying");
-  }
-
-  // profiling
-  if (should_profile) {
   }
 
 #ifdef OUTPUT 
@@ -861,8 +783,6 @@ pair<size_t, size_t> Compute_Delay_Skipping(graph<vertex>& G, std::vector<long> 
 #endif
 
   Frontier.del();
-  pbbs::delete_array(CurrActiveArray, totalNumVertices);
-  pbbs::delete_array(NextActiveArray, totalNumVertices);
   pbbs::delete_array(ShortestPathLen, totalNumVertices);
   return make_pair(totalActivated, 0);
 }
