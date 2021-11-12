@@ -3045,18 +3045,18 @@ void heter_reordering(int argc, char* argv[]) {
     // start streaming.
     // input: G, P, bufferedQueries, batch size
     long selection = P.getOptionLongValue("-order",1);
-    // if (selection == 1) {
+    if (selection == 1) {
       cout << "\nsequential evaluation..\n";
       bufferStreamingTypes(G, truncatedQueriesWithTypes, 1, P);
-    // }
-    // if (selection == 2) {
+    }
+    if (selection == 2) {
       cout << "\non the unsorted buffer..\n";
       bufferStreamingTypes(G, truncatedQueriesWithTypes, bSize, P, true);
-    // }
-    // if (selection == 3) {
+    }
+    if (selection == 3) {
       cout << "\non the sorted buffer..\n";
       bufferStreamingTypes(G, sortedQueriesWithTypes, bSize, P, true);
-    // }
+    }
     
   }
 
