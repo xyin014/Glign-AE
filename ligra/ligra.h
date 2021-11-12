@@ -2965,6 +2965,7 @@ pair<vector<long>, vector<long>> streamingPreprocessingReturnHops(graph<vertex>&
   cout << "\nsorted queries: \n";
   for (long i = 0; i < sortedQueries.size(); i++) {
     // cout << sortedQueries[i] << ": " << distances[sortedQueries[i]] << endl;
+    cout << sortedQueries[i] << endl;
   }
 
   return make_pair(truncatedQueries, sortedQueries);
@@ -4266,7 +4267,9 @@ void test_8(int argc, char* argv[]) {
     vector<long> sortedQueries;
     vector<long> truncatedQueries;
     vector<long> propertySortedQueries;
-    tie(truncatedQueries, sortedQueries) = streamingPreprocessing(G, userQueries, n_high_deg, combination_max, P);
+
+    uintE* distances = pbbs::new_array<uintE>(G.n);
+    tie(truncatedQueries, sortedQueries) = streamingPreprocessingReturnHops(G, userQueries, n_high_deg, combination_max, P, distances);
     
 
     // start streaming.
@@ -4274,20 +4277,20 @@ void test_8(int argc, char* argv[]) {
     long selection = P.getOptionLongValue("-order",1);
     if (selection == 1) {
       cout << "\nsequential evaluation..\n";
-      bufferStreaming(G, truncatedQueries, 1, P);
+      bufferStreamingSkipping(G, truncatedQueries, 1, P, distances);
     }
     if (selection == 2) {
       cout << "\non the unsorted buffer..\n";
-      bufferStreaming(G, truncatedQueries, bSize, P, true);
+      bufferStreamingSkipping(G, truncatedQueries, bSize, P, distances, true);
     }
     if (selection == 3) {
       cout << "\non the sorted buffer..\n";
-      bufferStreaming(G, sortedQueries, bSize, P, true);
+      bufferStreamingSkipping(G, sortedQueries, bSize, P, distances, true);
     }
     if (selection == 4) {
       cout << "\non the property-based sorted buffer..\n";
       propertySortedQueries = reorderingByProperty(G, truncatedQueries, n_high_deg, P);
-      bufferStreaming(G, propertySortedQueries, bSize, P, true);
+      bufferStreamingSkipping(G, propertySortedQueries, bSize, P, distances, true);
     }
 
   } else {
