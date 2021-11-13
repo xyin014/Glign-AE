@@ -2917,6 +2917,50 @@ void scenario2(int argc, char* argv[]) {
 
 }
 
+// for delaying
+void heter_delaying(int argc, char* argv[]) {
+  commandLine P(argc,argv," [-s] <inFile>");
+  char* iFile = P.getArgument(0);
+  bool symmetric = P.getOptionValue("-s");
+  bool compressed = P.getOptionValue("-c");
+  bool binary = P.getOptionValue("-b");
+  bool mmap = P.getOptionValue("-m");
+  //cout << "mmap = " << mmap << endl;
+  long rounds = P.getOptionLongValue("-rounds",1);
+
+  string queryFileName = string(P.getOptionValue("-qf", ""));
+  int combination_max = P.getOptionLongValue("-max_combination", 256);
+  size_t bSize = P.getOptionLongValue("-batch", 4);
+  size_t n_high_deg = P.getOptionLongValue("-nhighdeg", 4);
+
+  cout << "graph file name: " << iFile << endl;
+  cout << "query file name: " << queryFileName << endl;
+
+  // Initialization and preprocessing
+  std::vector<long> userQueries; 
+  long start = -1;
+  char inFileName[300];
+  ifstream inFile;
+  sprintf(inFileName, queryFileName.c_str());
+  inFile.open(inFileName, ios::in);
+  while (inFile >> start) {
+    userQueries.push_back(start);
+  }
+  inFile.close();
+
+  // randomly shuffled each run
+  std::random_device rd;
+  auto rng = std::default_random_engine { rd() };
+  // auto rng = std::default_random_engine {};
+  std::shuffle(std::begin(userQueries), std::end(userQueries), rng);
+
+  cout << "number of random queries: " << userQueries.size() << endl;
+  int batch_size = userQueries.size();
+
+  
+
+}
+
 // for reordering
 void heter_reordering(int argc, char* argv[]) {
   commandLine P(argc,argv," [-s] <inFile>");
@@ -2937,7 +2981,7 @@ void heter_reordering(int argc, char* argv[]) {
   cout << "query file name: " << queryFileName << endl;
 
   benchmarkType tmp_type;
-  benchmarkType qTypes[2] = {benchmark_sssp, benchmark_bfs};
+  benchmarkType qTypes[4] = {benchmark_sssp, benchmark_bfs, benchmark_sswp, benchmark_ssnp};
   srand((unsigned)time(NULL));
   // for (int t = 0; t < 32; t++) {
   //   int rnd_idx = rand() % 4;
@@ -2954,7 +2998,7 @@ void heter_reordering(int argc, char* argv[]) {
   sprintf(inFileName, queryFileName.c_str());
   inFile.open(inFileName, ios::in);
   while (inFile >> start) {
-    int rnd_idx = rand() % 2;
+    int rnd_idx = rand() % 4;
     benchmarkType tmp_type = qTypes[rnd_idx];
     // if (tmp_type & benchmark_sssp) {
     //   cout << " sssp\n";
@@ -3891,6 +3935,11 @@ int parallel_main(int argc, char* argv[]) {
   if (options == "heter_reordering") {
     cout << "running heterogeneous queries with reordering\n";
     heter_reordering(argc, argv);  // reordering
+  }
+
+  if (options == "heter_delaying") {
+    cout << "running heterogeneous queries with delaying\n";
+    heter_delaying(argc, argv);  // reordering
   }
 
   if (options == "adaptive") {
