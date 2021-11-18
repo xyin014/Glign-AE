@@ -776,13 +776,13 @@ pair<size_t, size_t> Compute_Heter_Delay(graph<vertex>& G, std::vector<pair<long
 
 #ifdef OUTPUT 
   for (int i = 0; i < batch_size; i++) {
-    long start = vecQueries[i];
+    long start = vecQueries[i].first;
     char outFileName[300];
     sprintf(outFileName, "Heter_delay_skip_output_src%ld.%ld.%ld.out", start, edge_count, batch_size);
     FILE *fp;
     fp = fopen(outFileName, "w");
     for (long j = 0; j < n; j++)
-      fprintf(fp, "%ld %d\n", j, ShortestPathLen[j * batch_size + i]);
+      fprintf(fp, "%ld %d\n", j, QueryValues[j * batch_size + i]);
     fclose(fp);
   }
 #endif
