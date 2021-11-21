@@ -1291,6 +1291,390 @@ void scenario3(int argc, char* argv[]) {
   }
 }
 
+// for simple dealying
+void scenario3_simple(int argc, char* argv[]) {
+  commandLine P(argc,argv," [-s] <inFile>");
+  char* iFile = P.getArgument(0);
+  bool symmetric = P.getOptionValue("-s");
+  bool compressed = P.getOptionValue("-c");
+  bool binary = P.getOptionValue("-b");
+  bool mmap = P.getOptionValue("-m");
+  //cout << "mmap = " << mmap << endl;
+  long rounds = P.getOptionLongValue("-rounds",1);
+  // long total_len = P.getOptionLongValue("-total",512);
+  bool shouldShuffle = P.getOptionValue("-shuffle");
+
+  string queryFileName = string(P.getOptionValue("-qf", ""));
+  int combination_max = P.getOptionLongValue("-max_combination", 256);
+  size_t bSize = P.getOptionLongValue("-batch", 4);
+  size_t n_high_deg = P.getOptionLongValue("-nhighdeg", 4);
+
+  cout << "graph file name: " << iFile << endl;
+  cout << "query file name: " << queryFileName << endl;
+
+  // Initialization and preprocessing
+  std::vector<long> userQueries; 
+  long start = -1;
+  char inFileName[300];
+  ifstream inFile;
+  sprintf(inFileName, queryFileName.c_str());
+  inFile.open(inFileName, ios::in);
+  while (inFile >> start) {
+    userQueries.push_back(start);
+  }
+  inFile.close();
+
+  // randomly shuffled each run
+  std::random_device rd;
+  auto rng = std::default_random_engine { rd() };
+  // auto rng = std::default_random_engine {};
+  if (shouldShuffle)
+    std::shuffle(std::begin(userQueries), std::end(userQueries), rng);
+
+  cout << "number of random queries: " << userQueries.size() << endl;
+  int batch_size = userQueries.size();
+  
+  if (symmetric) {
+    cout << "symmetric graph\n";
+    graph<symmetricVertex> G =
+      readGraph<symmetricVertex>(iFile,compressed,symmetric,binary,mmap); //symmetric graph
+    // for(int r=0;r<rounds;r++) {
+    cout << "n=" << G.n << " m=" << G.m << endl;
+
+    size_t n = G.n;
+    // ========================================
+    // finding the high degree vertices and evluating BFS on high degree vtxs
+    std::vector<std::pair<long, long>> vIDDegreePairs;
+    for (long i = 0; i < n; i++) {
+      long temp_degree =  G.V[i].getOutDegree();
+      if (temp_degree >= 50) {
+        vIDDegreePairs.push_back(std::make_pair(i, temp_degree));
+      }
+    }
+    std::sort(vIDDegreePairs.begin(), vIDDegreePairs.end(), sortByLargerSecondElement);
+    vector<long> highdegQ;
+    int high_deg_batch = n_high_deg;
+    cout << "High Deg Vtxs: \n";
+    for (int i = 0; i < high_deg_batch; i++) {
+      highdegQ.push_back(vIDDegreePairs[i].first);
+      cout << vIDDegreePairs[i].first << ", degree: " << vIDDegreePairs[i].second << endl;
+    }
+
+    uintE* distances_multiple;
+    distances_multiple = Compute_Eval(G,highdegQ,P);
+    uintE* distances = pbbs::new_array<uintE>(n);
+    parallel_for(size_t i = 0; i < n; i++) {
+      distances[i] = (uintE)MAXLEVEL;
+    }
+    parallel_for(size_t i = 0; i < n; i++) {
+      for (int j = 0; j < high_deg_batch; j++) {
+        if (distances_multiple[j+i*high_deg_batch] < distances[i]) {
+          distances[i] = distances_multiple[j+i*high_deg_batch];
+        }
+      }
+    }
+    // hop distributions of input queries.
+    std::map<long, long> user_hist;
+    for (long i = 0; i < userQueries.size(); i++) {
+      int dist = distances[userQueries[i]];
+      user_hist[dist]++;
+    }
+    for (const auto& x : user_hist) std::cout << x.first << " " << x.second <<"\n";
+    
+    // Query evaluation: sequential, batching, delayed batching
+    vector<long> batchedQuery;
+    batchedQuery = userQueries;
+    cout << "=================\n";
+    vector<pair<size_t,size_t>> share_seq;
+    vector<pair<size_t,size_t>> share_base;
+    vector<pair<size_t,size_t>> share_delay;
+    vector<double> seq_times;
+
+    if (bSize == 1) {
+      // Sequential
+      timer t_seq;
+      vector<int> all_sizes = {2,4,8,16,32,64,128};
+      for (int j = 0; j < combination_max; j++) {
+        size_t seq_F = 0;
+        t_seq.start();
+        vector<long> tmp_single_query;
+        tmp_single_query.push_back(userQueries[j]);
+        // Compute_Base(G,tmp_single_query,P);
+        pair<size_t, size_t> share_cnt_seq = Compute_Base_Skipping(G,tmp_single_query,P,0);
+        seq_F = share_cnt_seq.first;
+        share_seq.push_back(share_cnt_seq);
+        t_seq.stop();
+        double seq_time = t_seq.totalTime;
+        seq_times.push_back(seq_time);
+        t_seq.reportTotal("sequential time");
+        cout << "seq F: " << seq_F << endl;
+      }
+
+      for (int i = 0; i < all_sizes.size(); i++) {
+        int tmp_size = all_sizes[i];
+        long batch_F = 0;
+        double batch_time = 0.0;
+        cout << "tmp_size: " << tmp_size << endl;
+        for (int j = 0; j < combination_max; j=j+tmp_size) {
+          for (int k = 0; k < tmp_size; k++) {
+            long tmp_F = share_seq[j+k].first;
+            batch_F += tmp_F;
+          }
+          cout << tmp_size << " batch_time: " << batch_time << endl;
+          cout << tmp_size << " batch_F: " << batch_F << endl;
+        }
+      }
+    } else {
+      for (int i = 0; i < combination_max; i=i+bSize) {
+        timer t_batch, t_delay;
+        // std::shuffle(std::begin(batchedQuery), std::end(batchedQuery), rng);
+        vector<long> tmp_batch;
+        cout << "Evaluating queries: ";
+        for (int j = 0; j < bSize; j++) {
+          long tmp_query_id = batchedQuery[i+j];
+          tmp_batch.push_back(tmp_query_id);
+          cout << tmp_query_id << " ";
+        }
+        cout << endl;
+
+        // Batching
+        t_batch.start();
+        // Compute_Base(G,tmp_batch,P);
+        pair<size_t, size_t> share_cnt_base = Compute_Base_Skipping(G,tmp_batch,P,0);
+        cout << "base F: " << share_cnt_base.first << endl;
+        share_base.push_back(share_cnt_base);
+        t_batch.stop();
+
+
+        // Delayed batching
+        vector<int> dist_to_high;
+        long total_delays = 0;
+        for (int j = 0; j < tmp_batch.size(); j++) {
+          cout << "q" << j << " to highest deg vtx: " << distances[tmp_batch[j]] << endl;
+          if (distances[tmp_batch[j]] != MAXLEVEL) {
+            dist_to_high.push_back(distances[tmp_batch[j]]);
+          } else {
+            dist_to_high.push_back(-1);
+          }
+        }
+        int max_dist_to_high = *max_element(dist_to_high.begin(), dist_to_high.end());
+
+        for (int j = 0; j < dist_to_high.size(); j++) {
+          if (dist_to_high[j] == -1) {
+            dist_to_high[j] = max_dist_to_high;
+          }
+        }
+
+        for (int j = 0; j < dist_to_high.size(); j++) {
+          dist_to_high[j] = max_dist_to_high - dist_to_high[j];
+          total_delays += dist_to_high[j];
+          cout << "No. " << j << " defer " << dist_to_high[j] << " iterations\n";
+        }
+        cout << "Total delays (delta): " << total_delays << endl;
+
+        t_delay.start();
+        // Compute_Delay(G,tmp_batch,P,dist_to_high);
+        pair<size_t, size_t> share_cnt = Compute_Delay_Skipping(G,tmp_batch,P,dist_to_high);
+        cout << "delay F: " << share_cnt.first << endl;
+        share_delay.push_back(share_cnt);
+        t_delay.stop();
+
+        
+        double batch_time = t_batch.totalTime;
+        double delay_time = t_delay.totalTime;
+        
+        t_batch.reportTotal("batching evaluation time");
+        t_delay.reportTotal("delayed batching evaluation time");
+
+        // cout << "Batching speedup: " << seq_time / batch_time << endl;
+        // cout << "Delayed batching speedup: " << seq_time / delay_time << endl;
+
+        // // profiling the affinities
+        // Compute_Base(G,tmp_batch,P,true);
+        // Compute_Delay(G,tmp_batch,P,dist_to_high,true);
+
+        cout << "=================\n";
+      }
+    }
+
+    G.del();
+    pbbs::delete_array(distances, n);
+    pbbs::delete_array(distances_multiple, n*highdegQ.size());
+
+  } else {
+    // For directed graph...
+    cout << "asymmetric graph\n";
+    graph<asymmetricVertex> G =
+      readGraph<asymmetricVertex>(iFile,compressed,symmetric,binary,mmap); //asymmetric graph
+    cout << "n=" << G.n << " m=" << G.m << endl;
+
+    size_t n = G.n;
+    // ========================================
+    // finding the high degree vertices and evluating BFS on high degree vtxs
+    std::vector<std::pair<long, long>> vIDDegreePairs;
+    for (long i = 0; i < n; i++) {
+      long temp_degree =  G.V[i].getOutDegree();
+      if (temp_degree >= 50) {
+        vIDDegreePairs.push_back(std::make_pair(i, temp_degree));
+      }
+    }
+    std::sort(vIDDegreePairs.begin(), vIDDegreePairs.end(), sortByLargerSecondElement);
+    vector<long> highdegQ;
+    int high_deg_batch = n_high_deg;
+    cout << "High Deg Vtxs: \n";
+    for (int i = 0; i < high_deg_batch; i++) {
+      highdegQ.push_back(vIDDegreePairs[i].first);
+      cout << vIDDegreePairs[i].first << ", degree: " << vIDDegreePairs[i].second << endl;
+    }
+
+    uintE* distances_multiple;
+    // On edge reversed graph...
+    G.transpose();
+    distances_multiple = Compute_Eval(G,highdegQ,P);  // to get hops
+    uintE* distances = pbbs::new_array<uintE>(n);
+    G.transpose();
+    parallel_for(size_t i = 0; i < n; i++) {
+      distances[i] = (uintE)MAXLEVEL;
+    }
+    parallel_for(size_t i = 0; i < n; i++) {
+      for (int j = 0; j < high_deg_batch; j++) {
+        if (distances_multiple[j+i*high_deg_batch] < distances[i]) {
+          distances[i] = distances_multiple[j+i*high_deg_batch];
+        }
+      }
+    }
+    // hop distributions of input queries.
+    std::map<long, long> user_hist;
+    for (long i = 0; i < userQueries.size(); i++) {
+      int dist = distances[userQueries[i]];
+      user_hist[dist]++;
+    }
+    for (const auto& x : user_hist) std::cout << x.first << " " << x.second <<"\n";
+    
+    // Query evaluation: sequential, batching, delayed batching
+    vector<long> batchedQuery;
+    batchedQuery = userQueries;
+    cout << "=================\n";
+    vector<pair<size_t,size_t>> share_seq;
+    vector<pair<size_t,size_t>> share_base;
+    vector<pair<size_t,size_t>> share_delay;
+    vector<double> seq_times;
+
+    if (bSize == 1) {
+      // Sequential
+      timer t_seq;
+      vector<int> all_sizes = {2,4,8,16,32,64,128};
+      for (int j = 0; j < combination_max; j++) {
+        size_t seq_F = 0;
+        t_seq.start();
+        vector<long> tmp_single_query;
+        tmp_single_query.push_back(userQueries[j]);
+        cout << "seq query: " << userQueries[j] << endl;
+        // Compute_Base(G,tmp_single_query,P);
+        pair<size_t, size_t> share_cnt_seq = Compute_Base_Skipping(G,tmp_single_query,P,0);
+        seq_F = share_cnt_seq.first;
+        share_seq.push_back(share_cnt_seq);
+        t_seq.stop();
+        double seq_time = t_seq.totalTime;
+        seq_times.push_back(seq_time);
+        t_seq.reportTotal("sequential time");
+        cout << "seq F: " << seq_F << endl;
+      }
+      cout << "========\n";
+      for (int i = 0; i < all_sizes.size(); i++) {
+        int tmp_size = all_sizes[i];
+        long batch_F = 0;
+        double batch_time = 0.0;
+        cout << "tmp_size: " << tmp_size << endl;
+        for (int j = 0; j < combination_max; j=j+tmp_size) {
+          for (int k = 0; k < tmp_size; k++) {
+            long tmp_F = share_seq[j+k].first;
+            batch_F += tmp_F;
+            batch_time += seq_times[j+k];
+          }
+          cout << tmp_size << " batch_time: " << batch_time << endl;
+          cout << tmp_size << " batch_F: " << batch_F << endl;
+        }
+        cout << "====\n";
+      }
+    } else {
+      for (int i = 0; i < combination_max; i=i+bSize) {
+        timer t_batch, t_delay;
+        // std::shuffle(std::begin(batchedQuery), std::end(batchedQuery), rng);
+        vector<long> tmp_batch;
+        cout << "Evaluating queries: ";
+        for (int j = 0; j < bSize; j++) {
+          long tmp_query_id = batchedQuery[i+j];
+          tmp_batch.push_back(tmp_query_id);
+          cout << tmp_query_id << " ";
+        }
+        cout << endl;
+
+        // Batching
+        t_batch.start();
+        // Compute_Base(G,tmp_batch,P);
+        pair<size_t, size_t> share_cnt_base = Compute_Base_Skipping(G,tmp_batch,P,0);
+        cout << "base F: " << share_cnt_base.first << endl;
+        share_base.push_back(share_cnt_base);
+        t_batch.stop();
+
+
+        // Delayed batching
+        vector<int> dist_to_high;
+        long total_delays = 0;
+        for (int j = 0; j < tmp_batch.size(); j++) {
+          cout << "q" << j << " to highest deg vtx: " << distances[tmp_batch[j]] << endl;
+          if (distances[tmp_batch[j]] != MAXLEVEL) {
+            dist_to_high.push_back(distances[tmp_batch[j]]);
+          } else {
+            dist_to_high.push_back(-1);
+          }
+        }
+        int max_dist_to_high = *max_element(dist_to_high.begin(), dist_to_high.end());
+
+        for (int j = 0; j < dist_to_high.size(); j++) {
+          if (dist_to_high[j] == -1) {
+            dist_to_high[j] = max_dist_to_high;
+          }
+        }
+
+        for (int j = 0; j < dist_to_high.size(); j++) {
+          dist_to_high[j] = max_dist_to_high - dist_to_high[j];
+          total_delays += dist_to_high[j];
+          cout << "No. " << j << " defer " << dist_to_high[j] << " iterations\n";
+        }
+        cout << "Total delays (delta): " << total_delays << endl;
+
+        t_delay.start();
+        // Compute_Delay(G,tmp_batch,P,dist_to_high);
+        pair<size_t, size_t> share_cnt = Compute_Delay_Skipping(G,tmp_batch,P,dist_to_high);
+        cout << "delay F: " << share_cnt.first << endl;
+        share_delay.push_back(share_cnt);
+        t_delay.stop();
+
+        
+        double batch_time = t_batch.totalTime;
+        double delay_time = t_delay.totalTime;
+        
+        t_batch.reportTotal("batching evaluation time");
+        t_delay.reportTotal("delayed batching evaluation time");
+
+        // cout << "Batching speedup: " << seq_time / batch_time << endl;
+        // cout << "Delayed batching speedup: " << seq_time / delay_time << endl;
+
+        // // profiling the affinities
+        // Compute_Base(G,tmp_batch,P,true);
+        // Compute_Delay(G,tmp_batch,P,dist_to_high,true);
+
+        cout << "=================\n";
+      }
+    }
+    G.del();
+    pbbs::delete_array(distances, n);
+    pbbs::delete_array(distances_multiple, n*highdegQ.size());
+  }
+}
+
 void scenario_adaptive_new(int argc, char* argv[]) {
   commandLine P(argc,argv," [-s] <inFile>");
   char* iFile = P.getArgument(0);
@@ -5290,6 +5674,11 @@ int parallel_main(int argc, char* argv[]) {
   if (options == "cgq") {
     cout << "testing concurrent query processing on Ligra.\n";
     test_cgq(argc, argv);
+  }
+
+  if (options == "simple_delaying") {
+    cout << "testing delaying in a simple setting.\n";
+    scenario3_simple(argc, argv); // delaying
   }
 }
 #endif
