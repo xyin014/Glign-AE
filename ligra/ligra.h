@@ -1653,7 +1653,7 @@ void scenario3_simple(int argc, char* argv[]) {
         t_delay.start();
         // Compute_Delay(G,tmp_batch,P,dist_to_high);
         pair<size_t, size_t> share_cnt = Compute_Delay_Skipping(G,tmp_batch,P,dist_to_high);
-        cout << "delay F: " << share_cnt.first << endl;
+        cout << "batch " << bSize << " delay F: " << share_cnt.first << endl;
         share_delay.push_back(share_cnt);
         t_delay.stop();
 
