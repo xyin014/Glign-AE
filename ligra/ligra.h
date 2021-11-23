@@ -1412,16 +1412,19 @@ void scenario3_simple(int argc, char* argv[]) {
 
       for (int i = 0; i < all_sizes.size(); i++) {
         int tmp_size = all_sizes[i];
-        long batch_F = 0;
-        double batch_time = 0.0;
+        
         cout << "tmp_size: " << tmp_size << endl;
         for (int j = 0; j < combination_max; j=j+tmp_size) {
+          long batch_F = 0;
+          double batch_time = 0.0;
           for (int k = 0; k < tmp_size; k++) {
             long tmp_F = share_seq[j+k].first;
             batch_F += tmp_F;
+            double tmp_time = seq_times[j+k];
+            batch_time += tmp_time;
           }
-          cout << tmp_size << " batch_time: " << batch_time << endl;
-          cout << tmp_size << " batch_F: " << batch_F << endl;
+          cout << tmp_size << " seq_time: " << batch_time << endl;
+          cout << tmp_size << " seq_F: " << batch_F << endl;
         }
       }
     } else {
@@ -1482,9 +1485,10 @@ void scenario3_simple(int argc, char* argv[]) {
         
         double batch_time = t_batch.totalTime;
         double delay_time = t_delay.totalTime;
-        
-        t_batch.reportTotal("batching evaluation time");
-        t_delay.reportTotal("delayed batching evaluation time");
+        string tmp_report_batch = std::to_string(bSize) + " batching evaluation time";
+        string tmp_report_delay = std::to_string(bSize) + " delayed batching evaluation time";
+        t_batch.reportTotal(tmp_report_batch);
+        t_delay.reportTotal(tmp_report_delay);
 
         // cout << "Batching speedup: " << seq_time / batch_time << endl;
         // cout << "Delayed batching speedup: " << seq_time / delay_time << endl;
@@ -1583,17 +1587,18 @@ void scenario3_simple(int argc, char* argv[]) {
       cout << "========\n";
       for (int i = 0; i < all_sizes.size(); i++) {
         int tmp_size = all_sizes[i];
-        long batch_F = 0;
-        double batch_time = 0.0;
+        
         cout << "tmp_size: " << tmp_size << endl;
         for (int j = 0; j < combination_max; j=j+tmp_size) {
+          long batch_F = 0;
+          double batch_time = 0.0;
           for (int k = 0; k < tmp_size; k++) {
             long tmp_F = share_seq[j+k].first;
             batch_F += tmp_F;
             batch_time += seq_times[j+k];
           }
-          cout << tmp_size << " batch_time: " << batch_time << endl;
-          cout << tmp_size << " batch_F: " << batch_F << endl;
+          cout << tmp_size << " seq_time: " << batch_time << endl;
+          cout << tmp_size << " seq_F: " << batch_F << endl;
         }
         cout << "====\n";
       }
@@ -1614,7 +1619,7 @@ void scenario3_simple(int argc, char* argv[]) {
         t_batch.start();
         // Compute_Base(G,tmp_batch,P);
         pair<size_t, size_t> share_cnt_base = Compute_Base_Skipping(G,tmp_batch,P,0);
-        cout << "base F: " << share_cnt_base.first << endl;
+        cout << "batch " << bSize << " base F: " << share_cnt_base.first << endl;
         share_base.push_back(share_cnt_base);
         t_batch.stop();
 
@@ -1656,8 +1661,10 @@ void scenario3_simple(int argc, char* argv[]) {
         double batch_time = t_batch.totalTime;
         double delay_time = t_delay.totalTime;
         
-        t_batch.reportTotal("batching evaluation time");
-        t_delay.reportTotal("delayed batching evaluation time");
+        string tmp_report_batch = std::to_string(bSize) + " batching evaluation time";
+        string tmp_report_delay = std::to_string(bSize) + " delayed batching evaluation time";
+        t_batch.reportTotal(tmp_report_batch);
+        t_delay.reportTotal(tmp_report_delay);
 
         // cout << "Batching speedup: " << seq_time / batch_time << endl;
         // cout << "Delayed batching speedup: " << seq_time / delay_time << endl;
