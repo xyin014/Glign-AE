@@ -1399,6 +1399,7 @@ void scenario3_simple(int argc, char* argv[]) {
         t_seq.start();
         vector<long> tmp_single_query;
         tmp_single_query.push_back(userQueries[j]);
+        cout << "seq query: " << userQueries[j] << endl;
         // Compute_Base(G,tmp_single_query,P);
         pair<size_t, size_t> share_cnt_seq = Compute_Base_Skipping(G,tmp_single_query,P,0);
         seq_F = share_cnt_seq.first;
@@ -1410,6 +1411,7 @@ void scenario3_simple(int argc, char* argv[]) {
         cout << "seq F: " << seq_F << endl;
       }
 
+      cout << "========\n";
       for (int i = 0; i < all_sizes.size(); i++) {
         int tmp_size = all_sizes[i];
         
@@ -1426,6 +1428,7 @@ void scenario3_simple(int argc, char* argv[]) {
           cout << tmp_size << " seq_time: " << batch_time << endl;
           cout << tmp_size << " seq_F: " << batch_F << endl;
         }
+        cout << "====\n";
       }
     } else {
       for (int i = 0; i < combination_max; i=i+bSize) {
@@ -1444,7 +1447,7 @@ void scenario3_simple(int argc, char* argv[]) {
         t_batch.start();
         // Compute_Base(G,tmp_batch,P);
         pair<size_t, size_t> share_cnt_base = Compute_Base_Skipping(G,tmp_batch,P,0);
-        cout << "base F: " << share_cnt_base.first << endl;
+        cout << "batch " << bSize << " base F: " << share_cnt_base.first << endl;
         share_base.push_back(share_cnt_base);
         t_batch.stop();
 
@@ -1478,7 +1481,8 @@ void scenario3_simple(int argc, char* argv[]) {
         t_delay.start();
         // Compute_Delay(G,tmp_batch,P,dist_to_high);
         pair<size_t, size_t> share_cnt = Compute_Delay_Skipping(G,tmp_batch,P,dist_to_high);
-        cout << "delay F: " << share_cnt.first << endl;
+        // cout << "delay F: " << share_cnt.first << endl;
+        cout << "batch " << bSize << " delay F: " << share_cnt.first << endl;
         share_delay.push_back(share_cnt);
         t_delay.stop();
 
