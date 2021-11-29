@@ -3425,7 +3425,7 @@ void heter_reordering(int argc, char* argv[]) {
       }
       cout << "seq: \n";
       for (int i = 0; i < total_N.size(); i++) {
-        cout << total_N[i] << endl;
+        cout << "seq F: " << total_N[i] << endl;
       }
     }
     if (selection == 2) {
@@ -3433,7 +3433,7 @@ void heter_reordering(int argc, char* argv[]) {
       share_unsorted = bufferStreamingTypes(G, truncatedQueriesWithTypes, bSize, P, true);
       cout << "share_unsorted: \n";
       for (int i = 0; i < share_unsorted.size(); i++) {
-        cout << share_unsorted[i].first << endl;
+        cout << "unsorted F: " << share_unsorted[i].first << endl;
       }
     }
     if (selection == 3) {
@@ -3441,24 +3441,11 @@ void heter_reordering(int argc, char* argv[]) {
       share_sorted = bufferStreamingTypes(G, sortedQueriesWithTypes, bSize, P, true);
       cout << "share_sorted: \n";
       for (int i = 0; i < share_sorted.size(); i++) {
-        cout << share_sorted[i].first << endl;
+        cout << "sorted F: " << share_sorted[i].first << endl;
       }
     }
-    double share_ratio_unsorted = 0.0;
-    double share_ratio_sorted = 0.0;
-    cout << "size: " << total_N.size() << endl;
-    for (int i = 0; i < total_N.size(); i++) {
-      cout << i << endl;
-      size_t denominator = total_N[i];
-      size_t nominator_unsorted = share_unsorted[i].first;
-      size_t nominator_sorted = share_sorted[i].first;
-      cout << nominator_unsorted << " " << nominator_sorted << " " << denominator << endl;
-      cout << 1- 1.0*nominator_unsorted / denominator << " " << 1- 1.0*nominator_sorted / denominator << endl;
-      share_ratio_unsorted += (1 - 1.0*nominator_unsorted / denominator);
-      share_ratio_sorted += (1 - 1.0*nominator_sorted / denominator);
-    }
-    cout << "unsorted average sharing ratio: " << share_ratio_unsorted/total_N.size() << endl;
-    cout << "sorted average sharing ratio: " << share_ratio_sorted/total_N.size() << endl;
+    
+    
 
   } else {
     // For directed graph...
@@ -3501,7 +3488,7 @@ void heter_reordering(int argc, char* argv[]) {
       }
       cout << "seq: \n";
       for (int i = 0; i < total_N.size(); i++) {
-        cout << total_N[i] << endl;
+        cout << "seq F: " << total_N[i] << endl;
       }
     }
     if (selection == 2) {
@@ -3509,7 +3496,7 @@ void heter_reordering(int argc, char* argv[]) {
       share_unsorted = bufferStreamingTypes(G, truncatedQueriesWithTypes, bSize, P, true);
       cout << "share_unsorted: \n";
       for (int i = 0; i < share_unsorted.size(); i++) {
-        cout << share_unsorted[i].first << endl;
+        cout << "unsorted F: " << share_unsorted[i].first << endl;
       }
     }
     if (selection == 3) {
@@ -3517,24 +3504,9 @@ void heter_reordering(int argc, char* argv[]) {
       share_sorted = bufferStreamingTypes(G, sortedQueriesWithTypes, bSize, P, true);
       cout << "share_sorted: \n";
       for (int i = 0; i < share_sorted.size(); i++) {
-        cout << share_sorted[i].first << endl;
+        cout << "sorted F: " << share_sorted[i].first << endl;
       }
     }
-    double share_ratio_unsorted = 0.0;
-    double share_ratio_sorted = 0.0;
-    cout << "size: " << total_N.size() << endl;
-    for (int i = 0; i < total_N.size(); i++) {
-      cout << i << endl;
-      size_t denominator = total_N[i];
-      size_t nominator_unsorted = share_unsorted[i].first;
-      size_t nominator_sorted = share_sorted[i].first;
-      cout << nominator_unsorted << " " << nominator_sorted << " " << denominator << endl;
-      cout << 1- 1.0*nominator_unsorted / denominator << " " << 1- 1.0*nominator_sorted / denominator << endl;
-      share_ratio_unsorted += (1 - 1.0*nominator_unsorted / denominator);
-      share_ratio_sorted += (1 - 1.0*nominator_sorted / denominator);
-    }
-    cout << "unsorted average sharing ratio: " << share_ratio_unsorted/total_N.size() << endl;
-    cout << "sorted average sharing ratio: " << share_ratio_sorted/total_N.size() << endl;
     
   }
 
