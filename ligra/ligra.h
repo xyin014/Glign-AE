@@ -3328,6 +3328,7 @@ void heter_reordering(int argc, char* argv[]) {
   bool mmap = P.getOptionValue("-m");
   //cout << "mmap = " << mmap << endl;
   long rounds = P.getOptionLongValue("-rounds",1);
+  bool shouldShuffle = P.getOptionValue("-shuffle");
 
   string queryFileName = string(P.getOptionValue("-qf", ""));
   int combination_max = P.getOptionLongValue("-max_combination", 256);
@@ -3376,7 +3377,8 @@ void heter_reordering(int argc, char* argv[]) {
   // randomly shuffled each run
   std::random_device rd;
   auto rng = std::default_random_engine { rd() };
-  std::shuffle(std::begin(userQueries), std::end(userQueries), rng);
+  if (shouldShuffle)
+    std::shuffle(std::begin(userQueries), std::end(userQueries), rng);
   cout << "number of random queries: " << userQueries.size() << endl;
 
   int setSize = userQueries.size();
