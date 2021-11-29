@@ -3948,7 +3948,7 @@ void scenario2(int argc, char* argv[]) {
       }
       cout << "seq: \n";
       for (int i = 0; i < total_N.size(); i++) {
-        cout << total_N[i] << endl;
+        cout << "seq F: " << total_N[i] << endl;
       }
     }
     if (selection == 2) {
@@ -3956,7 +3956,7 @@ void scenario2(int argc, char* argv[]) {
       share_unsorted = bufferStreaming(G, truncatedQueries, bSize, P, true);
       cout << "share_unsorted: \n";
       for (int i = 0; i < share_unsorted.size(); i++) {
-        cout << share_unsorted[i].first << endl;
+        cout << "unsorted F: " << share_unsorted[i].first << endl;
       }
     }
     if (selection == 3) {
@@ -3964,7 +3964,7 @@ void scenario2(int argc, char* argv[]) {
       share_sorted = bufferStreaming(G, sortedQueries, bSize, P, true);
       cout << "share_sorted: \n";
       for (int i = 0; i < share_sorted.size(); i++) {
-        cout << share_sorted[i].first << endl;
+        cout << "sorted F: " << share_sorted[i].first << endl;
       }
     }
     if (selection == 4) {
@@ -3973,26 +3973,25 @@ void scenario2(int argc, char* argv[]) {
       share_prop = bufferStreaming(G, propertySortedQueries, bSize, P, true);
       cout << "share_prop: \n";
       for (int i = 0; i < share_prop.size(); i++) {
-        cout << share_prop[i].first << endl;
+        cout << "prop F: " << share_prop[i].first << endl;
       }
     }
 
-    double share_ratio_unsorted = 0.0;
-    double share_ratio_sorted = 0.0;
-    cout << "size: " << total_N.size() << endl;
-    for (int i = 0; i < total_N.size(); i++) {
-      cout << i << endl;
-      size_t denominator = total_N[i];
-      size_t nominator_unsorted = share_unsorted[i].first;
-      size_t nominator_sorted = share_sorted[i].first;
-      cout << nominator_unsorted << " " << nominator_sorted << " " << denominator << endl;
-      cout << 1- 1.0*nominator_unsorted / denominator << " " << 1- 1.0*nominator_sorted / denominator << endl;
-      share_ratio_unsorted += (1 - 1.0*nominator_unsorted / denominator);
-      share_ratio_sorted += (1 - 1.0*nominator_sorted / denominator);
-    }
-    cout << "unsorted average sharing ratio: " << share_ratio_unsorted/total_N.size() << endl;
-    cout << "sorted average sharing ratio: " << share_ratio_sorted/total_N.size() << endl;
-
+    // double share_ratio_unsorted = 0.0;
+    // double share_ratio_sorted = 0.0;
+    // cout << "size: " << total_N.size() << endl;
+    // for (int i = 0; i < total_N.size(); i++) {
+    //   cout << i << endl;
+    //   size_t denominator = total_N[i];
+    //   size_t nominator_unsorted = share_unsorted[i].first;
+    //   size_t nominator_sorted = share_sorted[i].first;
+    //   cout << nominator_unsorted << " " << nominator_sorted << " " << denominator << endl;
+    //   cout << 1- 1.0*nominator_unsorted / denominator << " " << 1- 1.0*nominator_sorted / denominator << endl;
+    //   share_ratio_unsorted += (1 - 1.0*nominator_unsorted / denominator);
+    //   share_ratio_sorted += (1 - 1.0*nominator_sorted / denominator);
+    // }
+    // cout << "unsorted average sharing ratio: " << share_ratio_unsorted/total_N.size() << endl;
+    // cout << "sorted average sharing ratio: " << share_ratio_sorted/total_N.size() << endl;
 
   } else {
     // For directed graph...
@@ -4028,7 +4027,7 @@ void scenario2(int argc, char* argv[]) {
       }
       cout << "seq: \n";
       for (int i = 0; i < total_N.size(); i++) {
-        cout << total_N[i] << endl;
+        cout << "seq F: " << total_N[i] << endl;
       }
     }
     if (selection == 2) {
@@ -4036,7 +4035,7 @@ void scenario2(int argc, char* argv[]) {
       share_unsorted = bufferStreaming(G, truncatedQueries, bSize, P, true);
       cout << "share_unsorted: \n";
       for (int i = 0; i < share_unsorted.size(); i++) {
-        cout << share_unsorted[i].first << endl;
+        cout << "unsorted F: " << share_unsorted[i].first << endl;
       }
     }
     if (selection == 3) {
@@ -4044,7 +4043,7 @@ void scenario2(int argc, char* argv[]) {
       share_sorted = bufferStreaming(G, sortedQueries, bSize, P, true);
       cout << "share_sorted: \n";
       for (int i = 0; i < share_sorted.size(); i++) {
-        cout << share_sorted[i].first << endl;
+        cout << "sorted F: " << share_sorted[i].first << endl;
       }
     }
     if (selection == 4) {
@@ -4053,25 +4052,25 @@ void scenario2(int argc, char* argv[]) {
       share_prop = bufferStreaming(G, propertySortedQueries, bSize, P, true);
       cout << "share_prop: \n";
       for (int i = 0; i < share_prop.size(); i++) {
-        cout << share_prop[i].first << endl;
+        cout << "prop F: " << share_prop[i].first << endl;
       }
     }
 
-    double share_ratio_unsorted = 0.0;
-    double share_ratio_sorted = 0.0;
-    cout << "size: " << total_N.size() << endl;
-    for (int i = 0; i < total_N.size(); i++) {
-      cout << i << endl;
-      size_t denominator = total_N[i];
-      size_t nominator_unsorted = share_unsorted[i].first;
-      size_t nominator_sorted = share_sorted[i].first;
-      cout << nominator_unsorted << " " << nominator_sorted << " " << denominator << endl;
-      cout << 1- 1.0*nominator_unsorted / denominator << " " << 1- 1.0*nominator_sorted / denominator << endl;
-      share_ratio_unsorted += (1 - 1.0*nominator_unsorted / denominator);
-      share_ratio_sorted += (1 - 1.0*nominator_sorted / denominator);
-    }
-    cout << "unsorted average sharing ratio: " << share_ratio_unsorted/total_N.size() << endl;
-    cout << "sorted average sharing ratio: " << share_ratio_sorted/total_N.size() << endl;
+    // double share_ratio_unsorted = 0.0;
+    // double share_ratio_sorted = 0.0;
+    // cout << "size: " << total_N.size() << endl;
+    // for (int i = 0; i < total_N.size(); i++) {
+    //   cout << i << endl;
+    //   size_t denominator = total_N[i];
+    //   size_t nominator_unsorted = share_unsorted[i].first;
+    //   size_t nominator_sorted = share_sorted[i].first;
+    //   cout << nominator_unsorted << " " << nominator_sorted << " " << denominator << endl;
+    //   cout << 1- 1.0*nominator_unsorted / denominator << " " << 1- 1.0*nominator_sorted / denominator << endl;
+    //   share_ratio_unsorted += (1 - 1.0*nominator_unsorted / denominator);
+    //   share_ratio_sorted += (1 - 1.0*nominator_sorted / denominator);
+    // }
+    // cout << "unsorted average sharing ratio: " << share_ratio_unsorted/total_N.size() << endl;
+    // cout << "sorted average sharing ratio: " << share_ratio_sorted/total_N.size() << endl;
 
     // if (selection == 4) {
     //   cout << "\non the property-based sorted buffer..\n";
@@ -4674,22 +4673,51 @@ void test_8(int argc, char* argv[]) {
     // start streaming.
     // input: G, P, bufferedQueries, batch size
     long selection = P.getOptionLongValue("-order",1);
+    vector<pair<size_t,size_t>> share1;
+    vector<pair<size_t,size_t>> share_unsorted;
+    vector<pair<size_t,size_t>> share_sorted;
+    vector<pair<size_t,size_t>> share_prop;
+    vector<size_t> total_N;
+
     if (selection == 1) {
       cout << "\nsequential evaluation..\n";
-      bufferStreamingSkipping(G, truncatedQueries, 1, P, distances);
+      share1 = bufferStreamingSkipping(G, truncatedQueries, 1, P, distances);
+      for (int i = 0; i < combination_max; i+=bSize) {
+        size_t temp = 0;
+        for (int j = i; j < i+bSize; j++) {
+          temp += share1[j].first;
+        }
+        total_N.push_back(temp);
+      }
+      cout << "seq: \n";
+      for (int i = 0; i < total_N.size(); i++) {
+        cout << "seq F: " << total_N[i] << endl;
+      }
     }
     if (selection == 2) {
       cout << "\non the unsorted buffer..\n";
-      bufferStreamingSkipping(G, truncatedQueries, bSize, P, distances, true);
+      share_unsorted = bufferStreamingSkipping(G, truncatedQueries, bSize, P, distances, true);
+      cout << "share_unsorted: \n";
+      for (int i = 0; i < share_unsorted.size(); i++) {
+        cout << "unsorted F: " << share_unsorted[i].first << endl;
+      }
     }
     if (selection == 3) {
       cout << "\non the sorted buffer..\n";
-      bufferStreamingSkipping(G, sortedQueries, bSize, P, distances, true);
+      share_sorted = bufferStreamingSkipping(G, sortedQueries, bSize, P, distances, true);
+      cout << "share_sorted: \n";
+      for (int i = 0; i < share_sorted.size(); i++) {
+        cout << "sorted F: " << share_sorted[i].first << endl;
+      }
     }
     if (selection == 4) {
       cout << "\non the property-based sorted buffer..\n";
       propertySortedQueries = reorderingByProperty(G, truncatedQueries, n_high_deg, P);
-      bufferStreamingSkipping(G, propertySortedQueries, bSize, P, distances, true);
+      share_prop = bufferStreamingSkipping(G, propertySortedQueries, bSize, P, distances, true);
+      cout << "share_prop: \n";
+      for (int i = 0; i < share_prop.size(); i++) {
+        cout << "prop F: " << share_prop[i].first << endl;
+      }
     }
 
   } else {
@@ -4714,76 +4742,51 @@ void test_8(int argc, char* argv[]) {
     vector<pair<size_t,size_t>> share1;
     vector<pair<size_t,size_t>> share_unsorted;
     vector<pair<size_t,size_t>> share_sorted;
+    vector<pair<size_t,size_t>> share_prop;
+    vector<size_t> total_N;
 
     if (selection == 1) {
       cout << "\nsequential evaluation with skipping..\n";
       share1 = bufferStreamingSkipping(G, truncatedQueries, 1, P, distances, true);
+      for (int i = 0; i < combination_max; i+=bSize) {
+      size_t temp = 0;
+      for (int j = i; j < i+bSize; j++) {
+        temp += share1[j].first;
+      }
+      total_N.push_back(temp);
+      }
+      cout << "seq: \n";
+      for (int i = 0; i < total_N.size(); i++) {
+        cout << "seq F: " << total_N[i] << endl;
+      }
     }
     if (selection == 2) {
       cout << "\non the unsorted buffer with skipping..\n";
       share_unsorted = bufferStreamingSkipping(G, truncatedQueries, bSize, P, distances, true);
+      cout << "share_unsorted: \n";
+      for (int i = 0; i < share_unsorted.size(); i++) {
+        cout << "unsorted F: " << share_unsorted[i].first << endl;
+      }
     }
     if (selection == 3) {
       cout << "\non the sorted buffer with skipping..\n";
       share_sorted = bufferStreamingSkipping(G, sortedQueries, bSize, P, distances, true);
-    }
-
-    vector<size_t> total_N;
-    for (int i = 0; i < combination_max; i+=bSize) {
-      size_t temp = 0;
-      for (int j = i; j < i+bSize; j++) {
-        temp += share1[j].first;
+      cout << "share_sorted: \n";
+      for (int i = 0; i < share_sorted.size(); i++) {
+        cout << "sorted F: " << share_sorted[i].first << endl;
       }
-      total_N.push_back(temp);
     }
 
-    double share_ratio_unsorted = 0.0;
-    double share_ratio_sorted = 0.0;
-    cout << "size: " << total_N.size() << endl;
-    for (int i = 0; i < total_N.size(); i++) {
-      cout << i << endl;
-      size_t denominator = total_N[i];
-      size_t nominator_unsorted = share_unsorted[i].first;
-      size_t nominator_sorted = share_sorted[i].first;
-      cout << nominator_unsorted << " " << nominator_sorted << " " << denominator << endl;
-      cout << 1- 1.0*nominator_unsorted / denominator << " " << 1- 1.0*nominator_sorted / denominator << endl;
-      share_ratio_unsorted += (1 - 1.0*nominator_unsorted / denominator);
-      share_ratio_sorted += (1 - 1.0*nominator_sorted / denominator);
-    }
-    cout << "unsorted average sharing ratio (with skipping): " << share_ratio_unsorted/total_N.size() << endl;
-    cout << "sorted average sharing ratio (with skipping): " << share_ratio_sorted/total_N.size() << endl;
-
-
-    cout << "\non the unsorted buffer without skipping..\n";
-    share_unsorted = bufferStreaming(G, truncatedQueries, bSize, P, true);
-    // }
-    cout << "\non the sorted buffer without skipping..\n";
-    share_sorted = bufferStreaming(G, sortedQueries, bSize, P, true);
-
-    total_N.clear();
-    for (int i = 0; i < combination_max; i+=bSize) {
-      size_t temp = 0;
-      for (int j = i; j < i+bSize; j++) {
-        temp += share1[j].first;
+    if (selection == 4) {
+      cout << "\non the property-based sorted buffer..\n";
+      propertySortedQueries = reorderingByProperty(G, truncatedQueries, n_high_deg, P);
+      share_prop = bufferStreaming(G, propertySortedQueries, bSize, P, true);
+      cout << "share_prop: \n";
+      for (int i = 0; i < share_prop.size(); i++) {
+        cout << "prop F: " << share_prop[i].first << endl;
       }
-      total_N.push_back(temp);
     }
 
-    share_ratio_unsorted = 0.0;
-    share_ratio_sorted = 0.0;
-    cout << "size: " << total_N.size() << endl;
-    for (int i = 0; i < total_N.size(); i++) {
-      cout << i << endl;
-      size_t denominator = total_N[i];
-      size_t nominator_unsorted = share_unsorted[i].first;
-      size_t nominator_sorted = share_sorted[i].first;
-      cout << nominator_unsorted << " " << nominator_sorted << " " << denominator << endl;
-      cout << 1- 1.0*nominator_unsorted / denominator << " " << 1- 1.0*nominator_sorted / denominator << endl;
-      share_ratio_unsorted += (1 - 1.0*nominator_unsorted / denominator);
-      share_ratio_sorted += (1 - 1.0*nominator_sorted / denominator);
-    }
-    cout << "unsorted average sharing ratio: " << share_ratio_unsorted/total_N.size() << endl;
-    cout << "sorted average sharing ratio: " << share_ratio_sorted/total_N.size() << endl;
   }
 }
 
