@@ -3478,7 +3478,8 @@ void heter_reordering(int argc, char* argv[]) {
 
     if (selection == 1) {
       cout << "\nsequential evaluation..\n";
-      share1 = bufferStreamingTypes(G, truncatedQueriesWithTypes, 1, P);
+      share1 = bufferStreamingTypes(G, truncatedQueriesWithTypes, 1, P, true);
+      cout << "share1 size: " << share1.size() << endl;
       for (int i = 0; i < combination_max; i+=bSize) {
         size_t temp = 0;
         for (int j = i; j < i+bSize; j++) {
