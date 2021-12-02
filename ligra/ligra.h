@@ -3565,7 +3565,7 @@ vector<pair<size_t, size_t>> streamingWithCGQ(graph<vertex>& G, std::vector<long
       double time1 = t_t1.totalTime;
       cout << "Profiling time: " << time1 << endl;
     }
-    pbbs::delete_array(vtx2chunk, G.n);
+    // pbbs::delete_array(vtx2chunk, G.n);
     return res;
 }
 
