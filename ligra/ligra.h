@@ -3512,19 +3512,19 @@ vector<pair<size_t, size_t>> bufferStreaming(graph<vertex>& G, std::vector<long>
 template <class vertex>
 vector<pair<size_t, size_t>> streamingWithCGQ(graph<vertex>& G, std::vector<long> bufferedQueries, set<set<long>>& C_Set, vector<long>& chunk_lookup, int bSize, commandLine P, bool should_profile=false) {
     
-    vector<set<long>> Tables;
-    Tables.insert(Tables.end(), C_Set.begin(), C_Set.end());
-    long chunk_size = Tables.size();
-    long* vtx2chunk = pbbs::new_array<long>(G.n);
+    // vector<set<long>> Tables;
+    // Tables.insert(Tables.end(), C_Set.begin(), C_Set.end());
+    // long chunk_size = Tables.size();
+    // long* vtx2chunk = pbbs::new_array<long>(G.n);
 
-    parallel_for(long i = 0; i < chunk_size; i++) {
-      set<long> tmp_chunk = Tables[i];
-      // cout << "Chunk " << i << endl;
-      for (auto e : tmp_chunk) {
-        // cout << "\t " << e << endl;
-        vtx2chunk[e] = i;
-      }
-    }
+    // parallel_for(long i = 0; i < chunk_size; i++) {
+    //   set<long> tmp_chunk = Tables[i];
+    //   // cout << "Chunk " << i << endl;
+    //   for (auto e : tmp_chunk) {
+    //     // cout << "\t " << e << endl;
+    //     vtx2chunk[e] = i;
+    //   }
+    // }
 
     timer start_time1; start_time1.start();
     for (int i = 0; i < bufferedQueries.size(); i=i+bSize) {
@@ -4524,56 +4524,56 @@ void test_cgq(int argc, char* argv[]) {
     vector<pair<size_t,size_t>> share_sorted;
 
     
-    size_t cache_size = 8 * 1024l * 1024l; // in MB
-    size_t graph_size = 694 * 1024l * 1024l; // in MB
-    size_t vtx_data_size = sizeof(long) * G.n;
-    long chunk_size = 0;
-    long tmp_block = cache_size / (1.0 + (1.0*vtx_data_size) / graph_size);
-    chunk_size = tmp_block / 16; // hardware concurrency
-    // long test_size = G.m * chunk_size / graph_size;
-    cout << G.m * chunk_size / graph_size << endl;
-    long edges_per_chunk = P.getOptionLongValue("-chunk_edge",960000l);
-    long test_size = edges_per_chunk;
-    cout << "chunk_size: " << chunk_size << ", num of edges: " << test_size << endl;
+    // size_t cache_size = 8 * 1024l * 1024l; // in MB
+    // size_t graph_size = 694 * 1024l * 1024l; // in MB
+    // size_t vtx_data_size = sizeof(long) * G.n;
+    // long chunk_size = 0;
+    // long tmp_block = cache_size / (1.0 + (1.0*vtx_data_size) / graph_size);
+    // chunk_size = tmp_block / 16; // hardware concurrency
+    // // long test_size = G.m * chunk_size / graph_size;
+    // cout << G.m * chunk_size / graph_size << endl;
+    // long edges_per_chunk = P.getOptionLongValue("-chunk_edge",960000l);
+    // long test_size = edges_per_chunk;
+    // cout << "chunk_size: " << chunk_size << ", num of edges: " << test_size << endl;
     set<set<long>> C_Set;
-    set<long> c_table;
+    // set<long> c_table;
 
-    size_t n = G.n;
-    std::vector<std::pair<long, long>> vIDDegreePairs;
-    for (long i = 0; i < n; i++) {
-      long temp_degree =  G.V[i].getOutDegree();
-      vIDDegreePairs.push_back(std::make_pair(i, temp_degree));
-    }
-    std::sort(vIDDegreePairs.begin(), vIDDegreePairs.end(), sortByLargerSecondElement);
+    // size_t n = G.n;
+    // std::vector<std::pair<long, long>> vIDDegreePairs;
+    // for (long i = 0; i < n; i++) {
+    //   long temp_degree =  G.V[i].getOutDegree();
+    //   vIDDegreePairs.push_back(std::make_pair(i, temp_degree));
+    // }
+    // std::sort(vIDDegreePairs.begin(), vIDDegreePairs.end(), sortByLargerSecondElement);
     
-    // chunking based on the vertex ID. To make them consecutive. 
+    // // chunking based on the vertex ID. To make them consecutive. 
     vector<long> chunk_lookup;
-    long tmp_num_edges = 0;
-    vector<long> tmp_c_table;
-    for (long idx = 0; idx < n; idx++) {
-      long deg =  G.V[idx].getOutDegree();
-      if (tmp_num_edges + deg <= test_size) {
-        // insert into chunk
-        tmp_c_table.push_back(idx);
-        tmp_num_edges += deg;
-      } else {
-        // store the chunk
-        C_Set.insert(set<long>(tmp_c_table.begin(), tmp_c_table.end()));
-        tmp_num_edges = 0;
-        tmp_c_table.clear();
-        tmp_c_table.push_back(idx);
-        tmp_num_edges += deg;
-        // vtxs before this point are belonging to the current chunk
-        chunk_lookup.push_back(idx); 
-      }
-    }
-    if (tmp_num_edges > 0 && !tmp_c_table.empty()) {
-      C_Set.insert(set<long>(tmp_c_table.begin(), tmp_c_table.end()));
-      tmp_num_edges = 0;
-      tmp_c_table.clear();
-    }
-    cout << "Num of Chunks: " << C_Set.size() << endl;
-    cout << "size of the lookup table: " << chunk_lookup.size() << endl;
+    // long tmp_num_edges = 0;
+    // vector<long> tmp_c_table;
+    // for (long idx = 0; idx < n; idx++) {
+    //   long deg =  G.V[idx].getOutDegree();
+    //   if (tmp_num_edges + deg <= test_size) {
+    //     // insert into chunk
+    //     tmp_c_table.push_back(idx);
+    //     tmp_num_edges += deg;
+    //   } else {
+    //     // store the chunk
+    //     C_Set.insert(set<long>(tmp_c_table.begin(), tmp_c_table.end()));
+    //     tmp_num_edges = 0;
+    //     tmp_c_table.clear();
+    //     tmp_c_table.push_back(idx);
+    //     tmp_num_edges += deg;
+    //     // vtxs before this point are belonging to the current chunk
+    //     chunk_lookup.push_back(idx); 
+    //   }
+    // }
+    // if (tmp_num_edges > 0 && !tmp_c_table.empty()) {
+    //   C_Set.insert(set<long>(tmp_c_table.begin(), tmp_c_table.end()));
+    //   tmp_num_edges = 0;
+    //   tmp_c_table.clear();
+    // }
+    // cout << "Num of Chunks: " << C_Set.size() << endl;
+    // cout << "size of the lookup table: " << chunk_lookup.size() << endl;
 
 
     // if (selection == 1) {
