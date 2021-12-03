@@ -3857,7 +3857,7 @@ vector<pair<size_t, size_t>> bufferStreamingSkipping(graph<vertex>& G, std::vect
         }
         timer t_t1;
         t_t1.start();
-        pair<size_t, size_t> share_cnt = Compute_Base_Skipping(G,tmpBatch,P,min_hops,true);
+        pair<size_t, size_t> share_cnt = Compute_Base_Skipping(G,tmpBatch,P,0,true);
         t_t1.stop();
         double time1 = t_t1.totalTime;
         batching_time += time1;
@@ -4783,7 +4783,7 @@ void test_8(int argc, char* argv[]) {
     if (selection == 4) {
       cout << "\non the property-based sorted buffer..\n";
       propertySortedQueries = reorderingByProperty(G, truncatedQueries, n_high_deg, P);
-      share_prop = bufferStreaming(G, propertySortedQueries, bSize, P, true);
+      share_prop = bufferStreamingSkipping(G, propertySortedQueries, bSize, P, distances, true);
       cout << "share_prop: \n";
       for (int i = 0; i < share_prop.size(); i++) {
         cout << "prop F: " << share_prop[i].first << endl;
