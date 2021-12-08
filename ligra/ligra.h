@@ -5748,6 +5748,7 @@ int query_generation_skew(int argc, char* argv[]) {
   }
 
   cout << "\nskewed queries: \n";
+  std::shuffle(std::begin(sortedQueries), std::end(sortedQueries), rng);
   for (long i = 0; i < sortedQueries.size(); i++) {
     cout << sortedQueries[i] << ": " << distances[sortedQueries[i]] << endl;
     // cout << sortedQueries[i] << endl;
