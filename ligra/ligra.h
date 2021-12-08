@@ -505,6 +505,8 @@ pair<size_t, size_t> Compute_Base_Dynamic(graph<vertex>&, vector<long>, queue<lo
 template<class vertex>
 pair<size_t, size_t> Compute_Chunk_Concurrent(graph<vertex>&, vector<long>&, intE*, bool*, bool*, long, long, commandLine, bool should_profile=false);
 
+template<class vertex>
+pair<vector<long>, vector<long>> streamingPreprocessingReturnHops(graph<vertex>& G, vector<long> userQueries, int n_high_deg, int combination_max, commandLine P, uintE* distances);
 
 template<class vertex>
 void Compute(hypergraph<vertex>&, commandLine);
@@ -1562,6 +1564,17 @@ void scenario3_simple(int argc, char* argv[]) {
     // Query evaluation: sequential, batching, delayed batching
     vector<long> batchedQuery;
     batchedQuery = userQueries;
+
+    vector<long> sortedQueries;
+    vector<long> truncatedQueries;
+    uintE* hop_distances = pbbs::new_array<uintE>(G.n);
+    tie(truncatedQueries, sortedQueries) = streamingPreprocessingReturnHops(G, batchedQuery, n_high_deg, combination_max, P, hop_distances);
+    bool shouldSort = P.getOptionValue("-sort");
+    if (shouldSort) {
+      cout << "input sorted\n";
+      userQueries = sortedQueries;
+      batchedQuery = sortedQueries;
+    }
     cout << "=================\n";
     vector<pair<size_t,size_t>> share_seq;
     vector<pair<size_t,size_t>> share_base;
@@ -3359,8 +3372,8 @@ pair<vector<long>, vector<long>> streamingPreprocessingReturnHops(graph<vertex>&
 
   cout << "\nsorted queries: \n";
   for (long i = 0; i < sortedQueries.size(); i++) {
-    // cout << sortedQueries[i] << ": " << distances[sortedQueries[i]] << endl;
-    cout << sortedQueries[i] << endl;
+    cout << sortedQueries[i] << ": " << distances[sortedQueries[i]] << endl;
+    // cout << sortedQueries[i] << endl;
   }
 
   return make_pair(truncatedQueries, sortedQueries);
@@ -4827,7 +4840,7 @@ void iBFS(int argc, char* argv[]) {
   std::random_device rd;
   auto rng = std::default_random_engine { rd() };
   // auto rng = std::default_random_engine {};
-  std::shuffle(std::begin(userQueries), std::end(userQueries), rng);
+  // std::shuffle(std::begin(userQueries), std::end(userQueries), rng);
   cout << "number of random queries: " << userQueries.size() << endl;
 
   int setSize = userQueries.size();
