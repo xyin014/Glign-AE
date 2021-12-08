@@ -3857,18 +3857,18 @@ vector<pair<size_t, size_t>> bufferStreamingSkipping(graph<vertex>& G, std::vect
           tmpBatch.push_back(bufferedQueries[i+j]);
         }
         // checking iterations to skip
-        int min_hops = MAXPATH;
-        for (int k = 0; k < tmpBatch.size(); k++) {
-          if (min_hops > distances[tmpBatch[k]]) {
-            min_hops = distances[tmpBatch[k]];
-          }
-        }
-        cout << "min_hops: " << min_hops << endl;
-        bool shouldSkip = P.getOptionValue("-skip");
-        if (!shouldSkip) {
-          // cout << "no checking at all...\n";
-          min_hops = 0;
-        }
+        // int min_hops = MAXPATH;
+        // for (int k = 0; k < tmpBatch.size(); k++) {
+        //   if (min_hops > distances[tmpBatch[k]]) {
+        //     min_hops = distances[tmpBatch[k]];
+        //   }
+        // }
+        // cout << "min_hops: " << min_hops << endl;
+        // bool shouldSkip = P.getOptionValue("-skip");
+        // if (!shouldSkip) {
+        //   // cout << "no checking at all...\n";
+        //   min_hops = 0;
+        // }
         timer t_t1;
         t_t1.start();
         pair<size_t, size_t> share_cnt = Compute_Base_Skipping(G,tmpBatch,P,0,true);
@@ -4698,7 +4698,7 @@ void test_8(int argc, char* argv[]) {
 
     if (selection == 1) {
       cout << "\nsequential evaluation..\n";
-      share1 = bufferStreamingSkipping(G, truncatedQueries, 1, P, distances);
+      share1 = bufferStreamingSkipping(G, truncatedQueries, 1, P, distances, true);
       for (int i = 0; i < combination_max; i+=bSize) {
         size_t temp = 0;
         for (int j = i; j < i+bSize; j++) {
@@ -5025,10 +5025,9 @@ void iBFS(int argc, char* argv[]) {
     //     }
     //   }
     // }    
-
-
-    cout << "iBFS sorted: " << ibfs_sorted.size() << endl;
     
+    cout << "ibfs_sorted size: " << ibfs_sorted.size() << endl;
+
     vector<long> rest_queries;
     vector<long> rest_queries_original;
     vector<long> dummy_queries;
@@ -5054,11 +5053,36 @@ void iBFS(int argc, char* argv[]) {
       }
     }
 
-    bufferStreaming(G, truncatedQueries, 1, P);
-    bufferStreaming(G, truncatedQueries, bSize, P, false);
-    bufferStreaming(G, ibfs_sorted, bSize, P, false);
-    bufferStreaming(G, combined_sorted, bSize, P, false);
-    bufferStreaming(G, sortedQueries, bSize, P, false);
+    uintE* distances = pbbs::new_array<uintE>(G.n);
+
+    cout << "original size: " << truncatedQueries.size() << endl;
+    cout << "hop sorted size: " << sortedQueries.size() << endl;
+    cout << "ibfs_sorted size: " << ibfs_sorted.size() << endl;
+
+    if (selection == 1) {
+      cout << "==== seq ====\n";
+      bufferStreamingSkipping(G, truncatedQueries, 1, P, distances, true);
+    }
+
+    if (selection == 2) {
+      cout << "==== unsorted ====\n";
+      bufferStreamingSkipping(G, truncatedQueries, bSize, P, distances, true);
+    }
+
+    if (selection == 3) {
+      cout << "==== ibfs ====\n";
+      bufferStreamingSkipping(G, ibfs_sorted, bSize, P, distances, true);
+    }
+
+    if (selection == 4) {
+      cout << "==== combined sorting ====\n";
+      bufferStreamingSkipping(G, combined_sorted, bSize, P, distances, true);
+    }
+
+    if (selection == 5) {
+      cout << "==== sorted ====\n";
+      bufferStreamingSkipping(G, sortedQueries, bSize, P, distances, true);
+    }
   }
 
 }
