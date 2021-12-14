@@ -4893,7 +4893,10 @@ void iBFS(int argc, char* argv[]) {
     vector<long> sortedQueries;
     vector<long> truncatedQueries;
     vector<long> propertySortedQueries;
-    tie(truncatedQueries, sortedQueries) = streamingPreprocessing(G, userQueries, n_high_deg, combination_max, P);
+
+    uintE* distances = pbbs::new_array<uintE>(G.n);
+
+    tie(truncatedQueries, sortedQueries) = streamingPreprocessingReturnHops(G, userQueries, n_high_deg, combination_max, P, distances);
     
     // start streaming.
     // input: G, P, bufferedQueries, batch size
@@ -5053,7 +5056,8 @@ void iBFS(int argc, char* argv[]) {
       }
     }
 
-    uintE* distances = pbbs::new_array<uintE>(G.n);
+    // uintE* distances = pbbs::new_array<uintE>(G.n);
+    vector<pair<size_t,size_t>> share_unsorted;
 
     cout << "original size: " << truncatedQueries.size() << endl;
     cout << "hop sorted size: " << sortedQueries.size() << endl;
@@ -5066,7 +5070,11 @@ void iBFS(int argc, char* argv[]) {
 
     if (selection == 2) {
       cout << "==== unsorted ====\n";
-      bufferStreamingSkipping(G, truncatedQueries, bSize, P, distances, true);
+      share_unsorted = bufferStreamingSkipping(G, truncatedQueries, bSize, P, distances, true);
+      cout << "share_unsorted: \n";
+      for (int i = 0; i < share_unsorted.size(); i++) {
+        cout << "unsorted F: " << share_unsorted[i].first << endl;
+      }
     }
 
     if (selection == 3) {
