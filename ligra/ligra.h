@@ -274,7 +274,7 @@ vertexSubsetData<data> edgeMapData(graph<vertex>& GA, VS &vs, F f,
     if (outDegrees == 0) return vertexSubsetData<data>(numVertices);
   }
   if (!(fl & no_dense) && m + outDegrees > threshold) {
-    cout << "dense mod\n";
+    // cout << "dense mod\n";
     if(degrees) free(degrees);
     if(frontierVertices) free(frontierVertices);
     vs.toDense();
