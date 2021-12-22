@@ -3779,6 +3779,7 @@ vector<pair<size_t, size_t>> asyncStreaming(graph<vertex>& G, std::vector<long> 
 template <class vertex>
 vector<pair<size_t, size_t>> bufferStreamingSkipping(graph<vertex>& G, std::vector<long> bufferedQueries, int bSize, commandLine P, uintE* distances, bool should_profile=false) {
   vector<double> latency_map;
+  bool shouldDelay = P.getOptionValue("-delay");
     std::vector<double> arrivalTimes;
     for (int i = 0; i < bufferedQueries.size(); i++) {
       arrivalTimes.push_back(0.0);  // assuming all queries arrived at the same time.
@@ -3869,13 +3870,52 @@ vector<pair<size_t, size_t>> bufferStreamingSkipping(graph<vertex>& G, std::vect
         //   // cout << "no checking at all...\n";
         //   min_hops = 0;
         // }
-        timer t_t1;
-        t_t1.start();
-        pair<size_t, size_t> share_cnt = Compute_Base_Skipping(G,tmpBatch,P,0,true);
-        t_t1.stop();
-        double time1 = t_t1.totalTime;
-        batching_time += time1;
-        res.push_back(share_cnt);
+
+        if (shouldDelay) {
+          // cout << "with delaying\n";
+          // Delayed batching
+          vector<int> dist_to_high;
+          long total_delays = 0;
+          for (int j = 0; j < tmpBatch.size(); j++) {
+            // cout << "q" << j << " to highest deg vtx: " << distances[tmpBatch[j]] << endl;
+            if (distances[tmpBatch[j]] != MAXLEVEL) {
+              dist_to_high.push_back(distances[tmpBatch[j]]);
+            } else {
+              dist_to_high.push_back(-1);
+            }
+          }
+          int max_dist_to_high = *max_element(dist_to_high.begin(), dist_to_high.end());
+
+          for (int j = 0; j < dist_to_high.size(); j++) {
+            if (dist_to_high[j] == -1) {
+              dist_to_high[j] = max_dist_to_high;
+            }
+          }
+
+          for (int j = 0; j < dist_to_high.size(); j++) {
+            dist_to_high[j] = max_dist_to_high - dist_to_high[j];
+            total_delays += dist_to_high[j];
+            // cout << "No. " << j << " defer " << dist_to_high[j] << " iterations\n";
+          }
+          // cout << "Total delays (delta): " << total_delays << endl;
+
+          timer t_delay;
+          t_delay.start();
+          pair<size_t, size_t> share_cnt = Compute_Delay_Skipping(G,tmpBatch,P,dist_to_high);
+          t_delay.stop();
+          // cout << "batch " << bSize << " delay F: " << share_cnt.first << endl;
+          double time1 = t_delay.totalTime;
+          batching_time += time1;
+          res.push_back(share_cnt);
+        } else {
+          timer t_t1;
+          t_t1.start();
+          pair<size_t, size_t> share_cnt = Compute_Base_Skipping(G,tmpBatch,P,0,true);
+          t_t1.stop();
+          double time1 = t_t1.totalTime;
+          batching_time += time1;
+          res.push_back(share_cnt);
+        }
         // cout << share_cnt.first << " " << share_cnt.second << endl;
       }
       // t_t1.stop();
