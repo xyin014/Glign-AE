@@ -508,6 +508,9 @@ pair<size_t, size_t> Compute_Heter_Delay(graph<vertex>&, vector<pair<long, bench
 template<class vertex>
 void Compute(hypergraph<vertex>&, commandLine);
 
+template<class vertex>
+pair<vector<long>, vector<long>> streamingPreprocessingReturnHops(graph<vertex>& G, vector<long> userQueries, int n_high_deg, int combination_max, commandLine P, uintE* distances);
+
 bool sortByLargerSecondElement(const pair<long, long> &a, const pair<long, long> &b) {
   return (a.second > b.second);
 }
@@ -2663,6 +2666,85 @@ pair<vector<long>, vector<long>> streamingPreprocessing(graph<vertex>& G, vector
 }
 
 template <class vertex>
+pair<vector<long>, vector<long>> streamingPreprocessingReturnHops(graph<vertex>& G, vector<long> userQueries, int n_high_deg, int combination_max, commandLine P, uintE* distances) {
+  // input: graph, queries, queries_to_process, number of high degree vtxs.
+  // return: unsorted and sorted queries of size queries_to_process
+  vector<long> truncatedQueries;
+  vector<long> sortedQueries;
+  size_t n = G.n;
+  std::vector<std::pair<long, long>> vIDDegreePairs;
+  for (long i = 0; i < n; i++) {
+    long temp_degree =  G.V[i].getOutDegree();
+    if (temp_degree >= 50) {
+      vIDDegreePairs.push_back(std::make_pair(i, temp_degree));
+    }
+  }
+  std::sort(vIDDegreePairs.begin(), vIDDegreePairs.end(), sortByLargerSecondElement);
+  vector<long> highdegQ;
+  int high_deg_batch = n_high_deg;
+  for (int i = 0; i < high_deg_batch; i++) {
+    highdegQ.push_back(vIDDegreePairs[i].first);
+  }
+
+  uintE* distances_multiple;
+  // On edge reversed graph...
+  G.transpose();
+  distances_multiple = Compute_Eval(G,highdegQ,P);  // to get hops (bfs distance)
+  // uintE* distances = pbbs::new_array<uintE>(n);
+  G.transpose();
+  parallel_for(size_t i = 0; i < n; i++) {
+    distances[i] = (uintE)MAXLEVEL;
+  }
+  parallel_for(size_t i = 0; i < n; i++) {
+    for (int j = 0; j < high_deg_batch; j++) {
+      if (distances_multiple[j+i*high_deg_batch] < distances[i]) {
+        distances[i] = distances_multiple[j+i*high_deg_batch];
+      }
+    }
+  }
+  // hop distributions of input queries.
+  std::map<long, long> user_hist;
+  for (long i = 0; i < userQueries.size(); i++) {
+    int dist = distances[userQueries[i]];
+    user_hist[dist]++;
+  }
+  for (const auto& x : user_hist) std::cout << x.first << " " << x.second <<"\n";
+
+  for (long i = 0; i < combination_max; i++) {
+    truncatedQueries.push_back(userQueries[i]);
+  }
+  std::vector<std::pair<size_t, long>> vtxHopPairs;
+
+  cout << "\ninput queries: \n";
+  for (long i = 0; i < truncatedQueries.size(); i++) {
+    // cout << truncatedQueries[i] << ": " << distances[truncatedQueries[i]] << endl;
+    vtxHopPairs.push_back(std::make_pair(truncatedQueries[i], distances[truncatedQueries[i]]));
+  }
+
+
+  // int window_size = 256;
+  // for (int i = 0; i < degBatchPairs.size()/window_size; i++) {
+  //   std::sort(degBatchPairs.begin()+(i*window_size), degBatchPairs.begin()+(i+1)*window_size, sortByLargerSecondElement);
+  // }
+
+  std::sort(vtxHopPairs.begin(), vtxHopPairs.end(), sortByLargerSecondElement);
+
+  for (int i = 0; i < vtxHopPairs.size(); i++) {
+    long vID = vtxHopPairs[i].first;
+    sortedQueries.push_back(vID);
+    // cout << vID << " dist: " << degBatchPairs[i].second << endl;
+  }
+
+  cout << "\nsorted queries: \n";
+  for (long i = 0; i < sortedQueries.size(); i++) {
+    cout << sortedQueries[i] << ": " << distances[sortedQueries[i]] << endl;
+    // cout << sortedQueries[i] << endl;
+  }
+
+  return make_pair(truncatedQueries, sortedQueries);
+}
+
+template <class vertex>
 void bufferStreaming(graph<vertex>& G, std::vector<long> bufferedQueries, int bSize, commandLine P, bool should_profile=false) {
   vector<double> latency_map;
     std::vector<double> arrivalTimes;
@@ -2734,8 +2816,9 @@ void bufferStreaming(graph<vertex>& G, std::vector<long> bufferedQueries, int bS
 }
 
 template <class vertex>
-vector<pair<size_t, size_t>> bufferStreamingTypes(graph<vertex>& G, std::vector<pair<long, benchmarkType>> bufferedQueries, int bSize, commandLine P, bool should_profile=false) {
+vector<pair<size_t, size_t>> bufferStreamingTypes(graph<vertex>& G, std::vector<pair<long, benchmarkType>> bufferedQueries, int bSize, commandLine P, uintE* distances, bool should_profile=false) {
   bool isSkip = P.getOptionValue("-skip");
+  bool shouldDelay = P.getOptionValue("-delay");
   if (isSkip) cout << "evaluation with unified frontier\n";
   else cout << "evaluation without unified frontier\n";
   vector<double> latency_map;
@@ -2806,24 +2889,69 @@ vector<pair<size_t, size_t>> bufferStreamingTypes(graph<vertex>& G, std::vector<
 
     vector<pair<size_t, size_t>> res;
     if (should_profile) {
-      timer t_t1;
-      t_t1.start();
+      // timer t_t1;
+      // t_t1.start();
+      double batching_time = 0;
       for (int i = 0; i < bufferedQueries.size(); i=i+bSize) {
         std::vector<pair<long, benchmarkType>> tmpBatch;
         for (int j = 0; j < bSize; j++) {
           tmpBatch.push_back(bufferedQueries[i+j]);
         }
         if (isSkip) {
-          pair<size_t, size_t> share_cnt = Compute_Heter_Skip(G,tmpBatch,P);
-          res.push_back(share_cnt);
+          
+          if (shouldDelay) {
+            vector<int> dist_to_high;
+            long total_delays = 0;
+            for (int j = 0; j < tmpBatch.size(); j++) {
+              // cout << "q" << j << " to highest deg vtx: " << distances[tmp_batch[j].first] << endl;
+              if (distances[tmpBatch[j].first] != MAXLEVEL) {
+                dist_to_high.push_back(distances[tmpBatch[j].first]);
+              } else {
+                dist_to_high.push_back(-1);
+              }
+            }
+            int max_dist_to_high = *max_element(dist_to_high.begin(), dist_to_high.end());
+            for (int j = 0; j < dist_to_high.size(); j++) {
+              if (dist_to_high[j] == -1) {
+                dist_to_high[j] = max_dist_to_high;
+              }
+            }
+            for (int j = 0; j < dist_to_high.size(); j++) {
+              dist_to_high[j] = max_dist_to_high - dist_to_high[j];
+              total_delays += dist_to_high[j];
+              // cout << "No. " << j << " defer " << dist_to_high[j] << " iterations\n";
+            }
+            cout << "Total delays (delta): " << total_delays << endl;
+            timer t_delay;
+            t_delay.start();
+            pair<size_t, size_t> share_cnt = Compute_Heter_Delay(G,tmpBatch,P,dist_to_high);
+            t_delay.stop();
+            double time1 = t_delay.totalTime;
+            batching_time += time1;
+            res.push_back(share_cnt);
+          } else {
+            timer t_t1;
+            t_t1.start();
+            pair<size_t, size_t> share_cnt = Compute_Heter_Skip(G,tmpBatch,P);
+            t_t1.stop();
+            double time1 = t_t1.totalTime;
+            batching_time += time1;
+            res.push_back(share_cnt);
+          }
+          
         } else {
+          timer t_t1;
+          t_t1.start();
           pair<size_t, size_t> share_cnt = Compute_Heter_Base(G,tmpBatch,P);
+          t_t1.stop();
+          double time1 = t_t1.totalTime;
+          batching_time += time1;
           res.push_back(share_cnt);
         }
       }
-      t_t1.stop();
-      double time1 = t_t1.totalTime;
-      cout << "Profiling time: " << time1 << endl;
+      // t_t1.stop();
+      // double time1 = t_t1.totalTime;
+      cout << "Profiling time: " << batching_time << endl;
     }
     return res;
 }
@@ -3496,7 +3624,11 @@ void heter_reordering(int argc, char* argv[]) {
     vector<long> sortedQueries;
     vector<long> truncatedQueries;
     // vector<long> propertySortedQueries;
-    tie(truncatedQueries, sortedQueries) = streamingPreprocessing(G, userQueries, n_high_deg, combination_max, P);
+    // tie(truncatedQueries, sortedQueries) = streamingPreprocessing(G, userQueries, n_high_deg, combination_max, P);
+
+    uintE* distances = pbbs::new_array<uintE>(G.n);
+    tie(truncatedQueries, sortedQueries) = streamingPreprocessingReturnHops(G, userQueries, n_high_deg, combination_max, P, distances);
+
 
     vector<pair<long, benchmarkType>> sortedQueriesWithTypes;
     vector<pair<long, benchmarkType>> truncatedQueriesWithTypes;
@@ -3516,7 +3648,7 @@ void heter_reordering(int argc, char* argv[]) {
 
     if (selection == 1) {
       cout << "\nsequential evaluation..\n";
-      share1 = bufferStreamingTypes(G, truncatedQueriesWithTypes, 1, P);
+      share1 = bufferStreamingTypes(G, truncatedQueriesWithTypes, 1, P, distances, true);
       for (int i = 0; i < combination_max; i+=bSize) {
         size_t temp = 0;
         for (int j = i; j < i+bSize; j++) {
@@ -3531,7 +3663,7 @@ void heter_reordering(int argc, char* argv[]) {
     }
     if (selection == 2) {
       cout << "\non the unsorted buffer..\n";
-      share_unsorted = bufferStreamingTypes(G, truncatedQueriesWithTypes, bSize, P, true);
+      share_unsorted = bufferStreamingTypes(G, truncatedQueriesWithTypes, bSize, P, distances, true);
       cout << "share_unsorted: \n";
       for (int i = 0; i < share_unsorted.size(); i++) {
         cout << "unsorted F: " << share_unsorted[i].first << endl;
@@ -3539,7 +3671,7 @@ void heter_reordering(int argc, char* argv[]) {
     }
     if (selection == 3) {
       cout << "\non the sorted buffer..\n";
-      share_sorted = bufferStreamingTypes(G, sortedQueriesWithTypes, bSize, P, true);
+      share_sorted = bufferStreamingTypes(G, sortedQueriesWithTypes, bSize, P, distances, true);
       cout << "share_sorted: \n";
       for (int i = 0; i < share_sorted.size(); i++) {
         cout << "sorted F: " << share_sorted[i].first << endl;
@@ -3559,7 +3691,10 @@ void heter_reordering(int argc, char* argv[]) {
     vector<long> sortedQueries;
     vector<long> truncatedQueries;
     vector<long> propertySortedQueries;
-    tie(truncatedQueries, sortedQueries) = streamingPreprocessing(G, userQueries, n_high_deg, combination_max, P);
+    // tie(truncatedQueries, sortedQueries) = streamingPreprocessing(G, userQueries, n_high_deg, combination_max, P);
+
+    uintE* distances = pbbs::new_array<uintE>(G.n);
+    tie(truncatedQueries, sortedQueries) = streamingPreprocessingReturnHops(G, userQueries, n_high_deg, combination_max, P, distances);
 
     vector<pair<long, benchmarkType>> sortedQueriesWithTypes;
     vector<pair<long, benchmarkType>> truncatedQueriesWithTypes;
@@ -3579,7 +3714,7 @@ void heter_reordering(int argc, char* argv[]) {
 
     if (selection == 1) {
       cout << "\nsequential evaluation..\n";
-      share1 = bufferStreamingTypes(G, truncatedQueriesWithTypes, 1, P, true);
+      share1 = bufferStreamingTypes(G, truncatedQueriesWithTypes, 1, P, distances, true);
       cout << "share1 size: " << share1.size() << endl;
       for (int i = 0; i < combination_max; i+=bSize) {
         size_t temp = 0;
@@ -3595,7 +3730,7 @@ void heter_reordering(int argc, char* argv[]) {
     }
     if (selection == 2) {
       cout << "\non the unsorted buffer..\n";
-      share_unsorted = bufferStreamingTypes(G, truncatedQueriesWithTypes, bSize, P, true);
+      share_unsorted = bufferStreamingTypes(G, truncatedQueriesWithTypes, bSize, P, distances, true);
       cout << "share_unsorted: \n";
       for (int i = 0; i < share_unsorted.size(); i++) {
         cout << "unsorted F: " << share_unsorted[i].first << endl;
@@ -3603,7 +3738,7 @@ void heter_reordering(int argc, char* argv[]) {
     }
     if (selection == 3) {
       cout << "\non the sorted buffer..\n";
-      share_sorted = bufferStreamingTypes(G, sortedQueriesWithTypes, bSize, P, true);
+      share_sorted = bufferStreamingTypes(G, sortedQueriesWithTypes, bSize, P, distances, true);
       cout << "share_sorted: \n";
       for (int i = 0; i < share_sorted.size(); i++) {
         cout << "sorted F: " << share_sorted[i].first << endl;
