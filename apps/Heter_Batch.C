@@ -653,6 +653,7 @@ pair<size_t, size_t> Compute_Heter_Skip(graph<vertex>& G, std::vector<pair<long,
 
     // mode: no_dense, remove_duplicates (for batch size > 1)
     vertexSubset output = edgeMap(G, Frontier, Heterogeneous_SKIP_F(QueryValues, batch_size, typeArray), -1, no_dense|remove_duplicates);
+    // vertexSubset output = edgeMapDense(G, Frontier, Heterogeneous_SKIP_F(QueryValues, batch_size, typeArray), 0);
 
     Frontier.del();
     Frontier = output;
