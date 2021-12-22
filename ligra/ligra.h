@@ -274,14 +274,15 @@ vertexSubsetData<data> edgeMapData(graph<vertex>& GA, VS &vs, F f,
     if (outDegrees == 0) return vertexSubsetData<data>(numVertices);
   }
   if (!(fl & no_dense) && m + outDegrees > threshold) {
-    cout << "dense mod\n";
+    // cout << "dense mod\n";
     if(degrees) free(degrees);
     if(frontierVertices) free(frontierVertices);
     vs.toDense();
     return (fl & dense_forward) ?
       edgeMapDenseForward<data, vertex, VS, F>(GA, vs, f, fl) :
       edgeMapDense<data, vertex, VS, F>(GA, vs, f, fl);
-  } else {
+  } 
+  else {
     auto vs_out =
       (should_output(fl) && fl & sparse_no_filter) ? // only call snof when we output
       edgeMapSparse_no_filter<data, vertex, VS, F>(GA, frontierVertices, vs, degrees, vs.numNonzeros(), f, fl) :
