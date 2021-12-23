@@ -273,7 +273,7 @@ vertexSubsetData<data> edgeMapData(graph<vertex>& GA, VS &vs, F f,
     outDegrees = sequence::plusReduce(degrees, m);
     if (outDegrees == 0) return vertexSubsetData<data>(numVertices);
   }
-  // if (!(fl & no_dense) && m + outDegrees > threshold) {
+  if (!(fl & no_dense) && m + outDegrees > threshold) {
     // cout << "dense mod\n";
     if(degrees) free(degrees);
     if(frontierVertices) free(frontierVertices);
@@ -281,15 +281,15 @@ vertexSubsetData<data> edgeMapData(graph<vertex>& GA, VS &vs, F f,
     return (fl & dense_forward) ?
       edgeMapDenseForward<data, vertex, VS, F>(GA, vs, f, fl) :
       edgeMapDense<data, vertex, VS, F>(GA, vs, f, fl);
-  // } 
-  // else {
-  //   auto vs_out =
-  //     (should_output(fl) && fl & sparse_no_filter) ? // only call snof when we output
-  //     edgeMapSparse_no_filter<data, vertex, VS, F>(GA, frontierVertices, vs, degrees, vs.numNonzeros(), f, fl) :
-  //     edgeMapSparse<data, vertex, VS, F>(GA, frontierVertices, vs, degrees, vs.numNonzeros(), f, fl);
-  //   free(degrees); free(frontierVertices);
-  //   return vs_out;
-  // }
+  } 
+  else {
+    auto vs_out =
+      (should_output(fl) && fl & sparse_no_filter) ? // only call snof when we output
+      edgeMapSparse_no_filter<data, vertex, VS, F>(GA, frontierVertices, vs, degrees, vs.numNonzeros(), f, fl) :
+      edgeMapSparse<data, vertex, VS, F>(GA, frontierVertices, vs, degrees, vs.numNonzeros(), f, fl);
+    free(degrees); free(frontierVertices);
+    return vs_out;
+  }
 }
 
 // Regular edgeMap, where no extra data is stored per vertex.
@@ -3568,7 +3568,7 @@ void heter_reordering(int argc, char* argv[]) {
   cout << "graph file name: " << iFile << endl;
   cout << "query file name: " << queryFileName << endl;
 
-  benchmarkType tmp_type;
+  // benchmarkType tmp_type;
   benchmarkType qTypes[4] = {benchmark_sssp, benchmark_bfs, benchmark_sswp, benchmark_ssnp};
   srand((unsigned)time(NULL));
   // for (int t = 0; t < 32; t++) {
@@ -3585,8 +3585,12 @@ void heter_reordering(int argc, char* argv[]) {
   ifstream inFile;
   sprintf(inFileName, queryFileName.c_str());
   inFile.open(inFileName, ios::in);
+  int tmp_type = 0;
   while (inFile >> start) {
-    int rnd_idx = rand() % 4;
+    // int rnd_idx = rand() % 4;
+    int rnd_idx = tmp_type;
+    tmp_type++;
+    if (tmp_type == 4) tmp_type = 0;
     benchmarkType tmp_type = qTypes[rnd_idx];
     // if (tmp_type & benchmark_sssp) {
     //   cout << " sssp\n";
