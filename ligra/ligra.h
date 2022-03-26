@@ -273,7 +273,7 @@ vertexSubsetData<data> edgeMapData(graph<vertex>& GA, VS &vs, F f,
     outDegrees = sequence::plusReduce(degrees, m);
     if (outDegrees == 0) return vertexSubsetData<data>(numVertices);
   }
-  if (!(fl & no_dense) && m + outDegrees > threshold) {
+   if (!(fl & no_dense) && m + outDegrees > threshold) {
     // cout << "dense mod\n";
     if(degrees) free(degrees);
     if(frontierVertices) free(frontierVertices);
@@ -281,15 +281,15 @@ vertexSubsetData<data> edgeMapData(graph<vertex>& GA, VS &vs, F f,
     return (fl & dense_forward) ?
       edgeMapDenseForward<data, vertex, VS, F>(GA, vs, f, fl) :
       edgeMapDense<data, vertex, VS, F>(GA, vs, f, fl);
-  } 
-  else {
-    auto vs_out =
-      (should_output(fl) && fl & sparse_no_filter) ? // only call snof when we output
-      edgeMapSparse_no_filter<data, vertex, VS, F>(GA, frontierVertices, vs, degrees, vs.numNonzeros(), f, fl) :
-      edgeMapSparse<data, vertex, VS, F>(GA, frontierVertices, vs, degrees, vs.numNonzeros(), f, fl);
-    free(degrees); free(frontierVertices);
-    return vs_out;
-  }
+   } 
+   else {
+     auto vs_out =
+       (should_output(fl) && fl & sparse_no_filter) ? // only call snof when we output
+       edgeMapSparse_no_filter<data, vertex, VS, F>(GA, frontierVertices, vs, degrees, vs.numNonzeros(), f, fl) :
+       edgeMapSparse<data, vertex, VS, F>(GA, frontierVertices, vs, degrees, vs.numNonzeros(), f, fl);
+     free(degrees); free(frontierVertices);
+     return vs_out;
+   }
 }
 
 // Regular edgeMap, where no extra data is stored per vertex.
