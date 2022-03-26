@@ -3462,6 +3462,87 @@ vector<pair<size_t, size_t>> bufferStreaming(graph<vertex>& G, std::vector<long>
     return res;
 }
 
+template <class vertex>
+vector<pair<size_t, size_t>> bufferStreamingSeparateFrontiers(graph<vertex>& G, std::vector<long> bufferedQueries, int bSize, commandLine P, bool should_profile=false) {
+  vector<double> latency_map;
+    std::vector<double> arrivalTimes;
+    for (int i = 0; i < bufferedQueries.size(); i++) {
+      arrivalTimes.push_back(0.0);  // assuming all queries arrived at the same time.
+    } 
+    double static_latency = 0.0;
+    // double start_time1 = update_timer.get_time();
+    double earlier_start1 = 0;
+    double new_est = 0;
+    // double new_est = arrivalTimes[0+bSize-1];
+    timer start_time1; start_time1.start();
+    for (int i = 0; i < bufferedQueries.size(); i=i+bSize) {
+      // cout << "i: " << i << endl;
+      std::vector<long> tmpBatch;
+      double arrival_last_in_the_batch = arrivalTimes[i+bSize-1]; // last arrived in the batch
+      for (int j = 0; j < bSize; j++) {
+        tmpBatch.push_back(bufferedQueries[i+j]);
+        if (arrival_last_in_the_batch < new_est) {
+          // cout << "new_est - arrivalTimes[i+j]: " << new_est - arrivalTimes[i+j] << endl;
+          static_latency += new_est - arrivalTimes[i+j];
+        } else {
+          static_latency += arrival_last_in_the_batch - arrivalTimes[i+j];
+        }
+      }
+      
+      timer t_t1;
+      t_t1.start();
+      if (bSize != 1)
+        // Compute_Base(G,tmpBatch,P);
+      t_t1.stop();
+      double time1 = t_t1.totalTime;
+
+      // record latency for each query
+      for (int ii = 0; ii < bSize; ii++) {
+        latency_map.push_back(new_est+time1);
+      }
+
+      if (arrival_last_in_the_batch < new_est) {
+        new_est = time1 + new_est;
+      } else {
+        new_est = time1 + new_est + arrival_last_in_the_batch - new_est;
+      }
+      static_latency += (time1)*bSize;
+      
+      // cout << "current latency: " << static_latency << endl;
+    }
+    start_time1.stop();
+    double query_time1 = start_time1.totalTime;
+    // cout << "static batching version query time: " << query_time1 << endl;
+    // cout << "Static total latency: " << static_latency << endl;
+
+    double check_sum = 0.0;
+    sort(latency_map.begin(), latency_map.end());
+    for (int ii = 0; ii < bufferedQueries.size(); ii++) {
+      // cout << latency_map[ii] << endl;
+      check_sum += latency_map[ii];
+    }
+    cout << "check_sum: " << check_sum << endl;
+
+    vector<pair<size_t, size_t>> res;
+    if (should_profile) {
+      timer t_t1;
+      t_t1.start();
+      for (int i = 0; i < bufferedQueries.size(); i=i+bSize) {
+        std::vector<long> tmpBatch;
+        for (int j = 0; j < bSize; j++) {
+          tmpBatch.push_back(bufferedQueries[i+j]);
+        }
+        pair<size_t, size_t> share_cnt = Compute_Separate(G,tmpBatch,P,true);
+        res.push_back(share_cnt);
+        // cout << share_cnt.first << " " << share_cnt.second << endl;
+      }
+      t_t1.stop();
+      double time1 = t_t1.totalTime;
+      cout << "Profiling time: " << time1 << endl;
+    }
+    return res;
+}
+
 // template <class vertex>
 // vector<pair<size_t, size_t>> streamingWithChunks(graph<vertex>& G, std::vector<long> bufferedQueries, set<set<long>>& C_Set, vector<long>& chunk_lookup, int bSize, commandLine P, bool should_profile=false) {
     
@@ -4109,6 +4190,225 @@ void scenario2(int argc, char* argv[]) {
       for (int i = 0; i < share_prop.size(); i++) {
         cout << "prop F: " << share_prop[i].first << endl;
       }
+    }
+
+    // double share_ratio_unsorted = 0.0;
+    // double share_ratio_sorted = 0.0;
+    // cout << "size: " << total_N.size() << endl;
+    // for (int i = 0; i < total_N.size(); i++) {
+    //   cout << i << endl;
+    //   size_t denominator = total_N[i];
+    //   size_t nominator_unsorted = share_unsorted[i].first;
+    //   size_t nominator_sorted = share_sorted[i].first;
+    //   cout << nominator_unsorted << " " << nominator_sorted << " " << denominator << endl;
+    //   cout << 1- 1.0*nominator_unsorted / denominator << " " << 1- 1.0*nominator_sorted / denominator << endl;
+    //   share_ratio_unsorted += (1 - 1.0*nominator_unsorted / denominator);
+    //   share_ratio_sorted += (1 - 1.0*nominator_sorted / denominator);
+    // }
+    // cout << "unsorted average sharing ratio: " << share_ratio_unsorted/total_N.size() << endl;
+    // cout << "sorted average sharing ratio: " << share_ratio_sorted/total_N.size() << endl;
+
+    // if (selection == 4) {
+    //   cout << "\non the property-based sorted buffer..\n";
+    //   propertySortedQueries = reorderingByProperty(G, truncatedQueries, n_high_deg, P);
+    //   bufferStreaming(G, propertySortedQueries, bSize, P, true);
+    // }
+    // cout << "\non the property-based sorted buffer..\n";
+    // bufferStreaming(G, propertySortedQueries, bSize, P, true);
+  }
+}
+
+// for reordering
+void separate_frontiers(int argc, char* argv[]) {
+  commandLine P(argc,argv," [-s] <inFile>");
+  char* iFile = P.getArgument(0);
+  bool symmetric = P.getOptionValue("-s");
+  bool compressed = P.getOptionValue("-c");
+  bool binary = P.getOptionValue("-b");
+  bool mmap = P.getOptionValue("-m");
+  //cout << "mmap = " << mmap << endl;
+  long rounds = P.getOptionLongValue("-rounds",1);
+  bool shouldShuffle = P.getOptionValue("-shuffle");
+
+  string queryFileName = string(P.getOptionValue("-qf", ""));
+  int combination_max = P.getOptionLongValue("-max_combination", 256);
+  size_t bSize = P.getOptionLongValue("-batch", 4);
+  size_t n_high_deg = P.getOptionLongValue("-nhighdeg", 4);
+
+  cout << "graph file name: " << iFile << endl;
+  cout << "query file name: " << queryFileName << endl;
+
+  // Initialization and preprocessing
+  std::vector<long> userQueries; 
+  long start = -1;
+  char inFileName[300];
+  ifstream inFile;
+  sprintf(inFileName, queryFileName.c_str());
+  inFile.open(inFileName, ios::in);
+  while (inFile >> start) {
+    userQueries.push_back(start);
+  }
+  inFile.close();
+  // randomly shuffled each run
+  std::random_device rd;
+  auto rng = std::default_random_engine { rd() };
+  // auto rng = std::default_random_engine {};
+  if (shouldShuffle)
+    std::shuffle(std::begin(userQueries), std::end(userQueries), rng);
+  cout << "number of random queries: " << userQueries.size() << endl;
+
+  int setSize = userQueries.size();
+  std::vector<long> testQuery[setSize];
+
+  if (symmetric) {
+    cout << "symmetric graph\n";
+    graph<symmetricVertex> G =
+      readGraph<symmetricVertex>(iFile,compressed,symmetric,binary,mmap); //symmetric graph
+    // for(int r=0;r<rounds;r++) {
+    cout << "n=" << G.n << " m=" << G.m << endl;
+
+    // Streaming...
+    vector<long> sortedQueries;
+    vector<long> truncatedQueries;
+    vector<long> propertySortedQueries;
+    tie(truncatedQueries, sortedQueries) = streamingPreprocessing(G, userQueries, n_high_deg, combination_max, P);
+    
+
+    // start streaming.
+    // input: G, P, bufferedQueries, batch size
+    long selection = P.getOptionLongValue("-order",1);
+    vector<pair<size_t,size_t>> share1;
+    vector<pair<size_t,size_t>> share_unsorted;
+    vector<pair<size_t,size_t>> share_sorted;
+    vector<pair<size_t,size_t>> share_prop;
+    vector<size_t> total_N;
+
+    if (selection == 1) {
+      cout << "\nsequential evaluation..\n";
+      share1 = bufferStreaming(G, truncatedQueries, 1, P, true);
+      for (int i = 0; i < combination_max; i+=bSize) {
+        size_t temp = 0;
+        for (int j = i; j < i+bSize; j++) {
+          temp += share1[j].first;
+        }
+        total_N.push_back(temp);
+      }
+      cout << "seq: \n";
+      for (int i = 0; i < total_N.size(); i++) {
+        cout << "seq F: " << total_N[i] << endl;
+      }
+    }
+    if (selection == 2) {
+      cout << "\non the unsorted buffer..\n";
+      share_unsorted = bufferStreaming(G, truncatedQueries, bSize, P, true);
+      cout << "share_unsorted: \n";
+      for (int i = 0; i < share_unsorted.size(); i++) {
+        cout << "unsorted F: " << share_unsorted[i].first << endl;
+      }
+    }
+    if (selection == 3) {
+      cout << "\non the sorted buffer..\n";
+      share_sorted = bufferStreaming(G, sortedQueries, bSize, P, true);
+      cout << "share_sorted: \n";
+      for (int i = 0; i < share_sorted.size(); i++) {
+        cout << "sorted F: " << share_sorted[i].first << endl;
+      }
+    }
+    if (selection == 4) {
+      cout << "\non the property-based sorted buffer..\n";
+      propertySortedQueries = reorderingByProperty(G, truncatedQueries, n_high_deg, P);
+      share_prop = bufferStreaming(G, propertySortedQueries, bSize, P, true);
+      cout << "share_prop: \n";
+      for (int i = 0; i < share_prop.size(); i++) {
+        cout << "prop F: " << share_prop[i].first << endl;
+      }
+    }
+    if (selection == 5) {
+      cout << "\non the evaluation of version with only separate frontiers..\n";
+      bufferStreamingSeparateFrontiers(G, truncatedQueries, bSize, P, true);
+    }
+
+    // double share_ratio_unsorted = 0.0;
+    // double share_ratio_sorted = 0.0;
+    // cout << "size: " << total_N.size() << endl;
+    // for (int i = 0; i < total_N.size(); i++) {
+    //   cout << i << endl;
+    //   size_t denominator = total_N[i];
+    //   size_t nominator_unsorted = share_unsorted[i].first;
+    //   size_t nominator_sorted = share_sorted[i].first;
+    //   cout << nominator_unsorted << " " << nominator_sorted << " " << denominator << endl;
+    //   cout << 1- 1.0*nominator_unsorted / denominator << " " << 1- 1.0*nominator_sorted / denominator << endl;
+    //   share_ratio_unsorted += (1 - 1.0*nominator_unsorted / denominator);
+    //   share_ratio_sorted += (1 - 1.0*nominator_sorted / denominator);
+    // }
+    // cout << "unsorted average sharing ratio: " << share_ratio_unsorted/total_N.size() << endl;
+    // cout << "sorted average sharing ratio: " << share_ratio_sorted/total_N.size() << endl;
+
+  } else {
+    // For directed graph...
+    cout << "asymmetric graph\n";
+    graph<asymmetricVertex> G =
+      readGraph<asymmetricVertex>(iFile,compressed,symmetric,binary,mmap); //asymmetric graph
+    cout << "n=" << G.n << " m=" << G.m << endl;
+    
+    // Streaming...
+    vector<long> sortedQueries;
+    vector<long> truncatedQueries;
+    vector<long> propertySortedQueries;
+    tie(truncatedQueries, sortedQueries) = streamingPreprocessing(G, userQueries, n_high_deg, combination_max, P);
+    
+    // start streaming.
+    // input: G, P, bufferedQueries, batch size
+    long selection = P.getOptionLongValue("-order",1);
+    vector<pair<size_t,size_t>> share1;
+    vector<pair<size_t,size_t>> share_unsorted;
+    vector<pair<size_t,size_t>> share_sorted;
+    vector<pair<size_t,size_t>> share_prop;
+    vector<size_t> total_N;
+
+    if (selection == 1) {
+      cout << "\nsequential evaluation..\n";
+      share1 = bufferStreaming(G, truncatedQueries, 1, P, true);
+      for (int i = 0; i < combination_max; i+=bSize) {
+      size_t temp = 0;
+      for (int j = i; j < i+bSize; j++) {
+        temp += share1[j].first;
+      }
+      total_N.push_back(temp);
+      }
+      cout << "seq: \n";
+      for (int i = 0; i < total_N.size(); i++) {
+        cout << "seq F: " << total_N[i] << endl;
+      }
+    }
+    if (selection == 2) {
+      cout << "\non the unsorted buffer..\n";
+      share_unsorted = bufferStreaming(G, truncatedQueries, bSize, P, true);
+      cout << "share_unsorted: \n";
+      for (int i = 0; i < share_unsorted.size(); i++) {
+        cout << "unsorted F: " << share_unsorted[i].first << endl;
+      }
+    }
+    if (selection == 3) {
+      cout << "\non the sorted buffer..\n";
+      share_sorted = bufferStreaming(G, sortedQueries, bSize, P, true);
+      cout << "share_sorted: \n";
+      for (int i = 0; i < share_sorted.size(); i++) {
+        cout << "sorted F: " << share_sorted[i].first << endl;
+      }
+    }
+    if (selection == 4) {
+      cout << "\non the property-based sorted buffer..\n";
+      propertySortedQueries = reorderingByProperty(G, truncatedQueries, n_high_deg, P);
+      share_prop = bufferStreaming(G, propertySortedQueries, bSize, P, true);
+      cout << "share_prop: \n";
+      for (int i = 0; i < share_prop.size(); i++) {
+        cout << "prop F: " << share_prop[i].first << endl;
+      }
+    }
+    if (selection == 5) {
+      cout << "\non the evaluation of version with only separate frontiers..\n";
+      bufferStreamingSeparateFrontiers(G, truncatedQueries, bSize, P, true);
     }
 
     // double share_ratio_unsorted = 0.0;
@@ -5930,6 +6230,11 @@ int parallel_main(int argc, char* argv[]) {
   if (options == "cgq") {
     cout << "testing concurrent query processing on Ligra.\n";
     test_cgq(argc, argv);
+  }
+
+  if (options == "separate_frontiers") {
+    cout << "running impl that only with separate frontiers\n";
+    separate_frontiers(argc, argv);  // with only separate frontiers
   }
 
   if (options == "simple_delaying") {

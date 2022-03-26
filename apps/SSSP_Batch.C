@@ -72,6 +72,36 @@ struct DJ_F {
   inline bool cond (uintE d) { return cond_true(d); } 
 };
 
+struct DJ_SINGLE_F {
+  intE* ShortestPathLen;
+
+  DJ_SINGLE_F(intE* _ShortestPathLen) : 
+    ShortestPathLen(_ShortestPathLen) {}
+  
+  inline bool update (uintE s, uintE d, intE edgeLen) { //Update
+    bool ret = false;
+    intE newValue = ShortestPathLen[s] + edgeLen;
+    if (ShortestPathLen[d] > newValue) {
+      ShortestPathLen[d] = newValue;
+      ret = true;
+    }
+    return ret;
+  }
+  
+  inline bool updateAtomic (uintE s, uintE d, intE edgeLen){ //atomic version of Update
+    bool ret = false;
+    IdxType s_begin = s;
+    IdxType d_begin = d;
+    intE newValue = ShortestPathLen[s] + edgeLen;
+    if (writeMin(&ShortestPathLen[d], newValue)) {
+      ret = true;
+    }
+    return ret;
+  }
+  //cond function checks if vertex has been visited yet
+  inline bool cond (uintE d) { return cond_true(d); } 
+};
+
 struct DJ_SKIP_F {
   intE* ShortestPathLen;
   long BatchSize;
@@ -370,6 +400,80 @@ pair<size_t, size_t> Compute_Base(graph<vertex>& G, std::vector<long> vecQueries
   pbbs::delete_array(CurrActiveArray, totalNumVertices);
   pbbs::delete_array(NextActiveArray, totalNumVertices);
   pbbs::delete_array(overlaps, batch_size);
+  return make_pair(totalActivated, totalNoOverlap);
+}
+
+template <class vertex>
+pair<size_t, size_t> Compute_Separate(graph<vertex>& G, std::vector<long> vecQueries, commandLine P, bool should_profile) {
+  size_t n = G.n;
+  size_t edge_count = G.m;
+  long batch_size = vecQueries.size();
+
+  cout << "initializing\n";
+  intE** vals = pbbs::new_array<intE*>(batch_size);
+  bool** frontiers = pbbs::new_array<bool*>(n);
+  for (int i = 0; i < batch_size; i++) {
+    vals[i] = pbbs::new_array<intE>(n);
+    frontiers[i] = pbbs::new_array<bool>(n);
+    parallel_for(IdxType j = 0; j < n; j++) {
+      vals[i][j] = (intE)MAXPATH;
+      frontiers[i][j] = false;
+    }
+    vals[i][(IdxType)vecQueries[i]] = 0;
+    frontiers[i][(IdxType)vecQueries[i]] = true;
+  }
+
+  // for profiling
+  long iteration = 0;
+  size_t totalActivated = 0;
+  size_t totalNoOverlap = 0;
+
+  bool isConverged = true;
+  vertexSubset** vecFs = new vertexSubset*[batch_size];
+  // vector<vertexSubset*> vecFs(batch_size);
+  for (int i = 0; i < batch_size; i++) {
+    // vertexSubset Frontier_new(n, frontiers[i]);
+
+    vecFs[i] = new vertexSubset(n, frontiers[i]);
+    // vecFs.push_back(&Frontier_new);
+    isConverged = isConverged && vecFs[i]->isEmpty();
+  }
+  cout << "finished initializing\n";
+
+  while (!isConverged) {
+    iteration++;
+    cout << "iteration: " << iteration << endl;
+    parallel_for(int j = 0; j < batch_size; j++) {
+      vertexSubset output = edgeMap(G, *vecFs[j], DJ_SINGLE_F(vals[j]), -1, no_dense|remove_duplicates);
+      vecFs[j]->del();
+      *vecFs[j] = output;
+    }
+    bool isEmpty = true;
+    for (int i = 0; i < batch_size; i++) {
+      isEmpty = isEmpty && vecFs[i]->isEmpty();
+    }
+    isConverged = isEmpty;
+  }
+
+#ifdef OUTPUT 
+  for (int i = 0; i < batch_size; i++) {
+    long start = vecQueries[i];
+    char outFileName[300];
+    sprintf(outFileName, "SSSP_separate_output_src%ld.%ld.%ld.out", start, edge_count, batch_size);
+    FILE *fp;
+    fp = fopen(outFileName, "w");
+    for (long j = 0; j < n; j++)
+      fprintf(fp, "%ld %d\n", j, vals[i][j]);
+    fclose(fp);
+  }
+#endif
+
+  // Frontier.del();
+  for (int i = 0; i < batch_size; i++) {
+    vecFs[i]->del();
+    pbbs::delete_array(vals[i], n);
+  }
+
   return make_pair(totalActivated, totalNoOverlap);
 }
 
