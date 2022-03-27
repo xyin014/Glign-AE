@@ -393,6 +393,7 @@ pair<size_t, size_t> Compute_Base_Skipping(graph<vertex>& G, std::vector<long> v
    while(!Frontier.isEmpty()){
     iteration++;
     totalActivated += Frontier.size();
+    cout << "iteration: " << Frontier.size() << ": " << totalActivated << endl;
 
     // mode: no_dense, remove_duplicates (for batch size > 1)
     vertexSubset output = edgeMap(G, Frontier, SSWP_SKIP_F(WidestPathVal, batch_size), -1, no_dense|remove_duplicates);
@@ -453,6 +454,7 @@ pair<size_t, size_t> Compute_Delay_Skipping(graph<vertex>& G, std::vector<long> 
   while(!Frontier.isEmpty()){
     iteration++;
     totalActivated += Frontier.size();
+    cout << "iteration: " << Frontier.size() << ": " << totalActivated << endl;
 
     // mode: no_dense, remove_duplicates (for batch size > 1)
     vertexSubset output = edgeMap(G, Frontier, SSWP_SKIP_F(WidestPathVal, batch_size), -1, no_dense|remove_duplicates);
