@@ -498,6 +498,11 @@ pair<size_t, size_t> Compute_Base_Dynamic(graph<vertex>& G, std::vector<long> ve
 }
 
 template <class vertex>
+pair<size_t, size_t> Compute_Separate(graph<vertex>& G, std::vector<long> vecQueries, commandLine P, bool should_profile) {
+  return make_pair(0,0);
+}
+
+template <class vertex>
 pair<size_t, size_t> Compute_Delay(graph<vertex>& G, std::vector<long> vecQueries, commandLine P, std::vector<int> defer_vec, bool should_profile) {
   size_t n = G.n;
   size_t edge_count = G.m;
