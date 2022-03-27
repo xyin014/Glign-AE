@@ -343,7 +343,7 @@ pair<size_t, size_t> Compute_Base(graph<vertex>& G, std::vector<long> vecQueries
   size_t accumulated_overlap_only= 0;
   size_t peak_activation = 0;
   int peak_iter = 0;
-
+  size_t total_edges = 0;
   // vector<long> frontier_iterations;
   // vector<long> overlapped_iterations;
   // vector<long> accumulated_overlapped_iterations;
@@ -353,9 +353,13 @@ pair<size_t, size_t> Compute_Base(graph<vertex>& G, std::vector<long> vecQueries
     iteration++;
     totalActivated += Frontier.size();
     // cout << Frontier.size() << endl;
-    // profiling
-    if (should_profile) {
-      
+    // profile edge activations.
+    Frontier.toDense();
+    for (IdxType i = 0; i < n; i++) {
+      if (Frontier.d[i]) {
+        long temp_degree =  G.V[i].getOutDegree();
+        total_edges += temp_degree;
+      }
     }
 
     // mode: no_dense, remove_duplicates (for batch size > 1)
@@ -401,7 +405,7 @@ pair<size_t, size_t> Compute_Base(graph<vertex>& G, std::vector<long> vecQueries
   pbbs::delete_array(CurrActiveArray, totalNumVertices);
   pbbs::delete_array(NextActiveArray, totalNumVertices);
   pbbs::delete_array(overlaps, batch_size);
-  return make_pair(totalActivated, totalNoOverlap);
+  return make_pair(total_edges, totalNoOverlap);
 }
 
 template <class vertex>
