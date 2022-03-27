@@ -676,11 +676,19 @@ pair<size_t, size_t> Compute_Base_Skipping(graph<vertex>& G, std::vector<long> v
   long iteration = 0;
   size_t totalActivated = 0;
   size_t totalNoOverlap = 0;
-
+  size_t total_edges = 0;
   while(!Frontier.isEmpty()){
     iteration++;
     totalActivated += Frontier.size();
     cout << "iteration: " << Frontier.size() << ":: " << totalActivated << endl;
+    // profile edge activations.
+    Frontier.toDense();
+    for (IdxType i = 0; i < n; i++) {
+      if (Frontier.d[i]) {
+        long temp_degree =  G.V[i].getOutDegree();
+        total_edges += temp_degree;
+      }
+    }
 
     // mode: no_dense, remove_duplicates (for batch size > 1)
     if (iteration > skipIter) {
@@ -714,7 +722,7 @@ pair<size_t, size_t> Compute_Base_Skipping(graph<vertex>& G, std::vector<long> v
 
   Frontier.del();
   pbbs::delete_array(ShortestPathLen, totalNumVertices);
-  return make_pair(totalActivated, totalNoOverlap);
+  return make_pair(total_edges, totalNoOverlap);
 }
 
 template <class vertex>
@@ -853,11 +861,19 @@ pair<size_t, size_t> Compute_Delay_Skipping(graph<vertex>& G, std::vector<long> 
   // for profiling
   long iteration = 0;
   size_t totalActivated = 0;
-
+  size_t total_edges = 0;
   while(!Frontier.isEmpty()){
     iteration++;
     totalActivated += Frontier.size();
     cout << "iteration: " << Frontier.size() << ":: " << totalActivated << endl;
+    // profile edge activations.
+    Frontier.toDense();
+    for (IdxType i = 0; i < n; i++) {
+      if (Frontier.d[i]) {
+        long temp_degree =  G.V[i].getOutDegree();
+        total_edges += temp_degree;
+      }
+    }
 
     // mode: no_dense, remove_duplicates (for batch size > 1)
     vertexSubset output = edgeMap(G, Frontier, DJ_SKIP_F(ShortestPathLen, batch_size), -1, no_dense|remove_duplicates);
@@ -893,5 +909,5 @@ pair<size_t, size_t> Compute_Delay_Skipping(graph<vertex>& G, std::vector<long> 
 
   Frontier.del();
   pbbs::delete_array(ShortestPathLen, totalNumVertices);
-  return make_pair(totalActivated, 0);
+  return make_pair(total_edges, 0);
 }
