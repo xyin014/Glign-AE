@@ -364,18 +364,19 @@ pair<size_t, size_t> Compute_Base(graph<vertex>& G, std::vector<long> vecQueries
     Frontier.del();
     Frontier = output;
 
-    // Frontier.toDense();
-    // bool* new_d = Frontier.d;
-    // Frontier.d = nullptr;
-    // vertexSubset Frontier_new(n, new_d);
-    // Frontier.del();
-    // Frontier = Frontier_new;
+    Frontier.toDense();
+    bool* new_d = Frontier.d;
+    Frontier.d = nullptr;
+    vertexSubset Frontier_new(n, new_d);
+    Frontier.del();
+    Frontier = Frontier_new;
 
     std::swap(CurrActiveArray, NextActiveArray);
     parallel_for(IdxType i = 0; i < totalNumVertices; i++) {
       NextActiveArray[i] = false;
     }
   }
+  cout << "Total iterations: " << iteration << endl;
   // cout << endl;
   // profiling
   if (should_profile) {
@@ -442,7 +443,7 @@ pair<size_t, size_t> Compute_Separate(graph<vertex>& G, std::vector<long> vecQue
 
   while (!isConverged) {
     iteration++;
-    cout << "iteration: " << iteration << endl;
+    // cout << "iteration: " << iteration << endl;
     parallel_for(int j = 0; j < batch_size; j++) {
       vertexSubset output = edgeMap(G, *vecFs[j], DJ_SINGLE_F(vals[j]), -1, no_dense|remove_duplicates);
       vecFs[j]->del();
@@ -454,6 +455,7 @@ pair<size_t, size_t> Compute_Separate(graph<vertex>& G, std::vector<long> vecQue
     }
     isConverged = isEmpty;
   }
+  cout << "Total iterations: " << iteration << endl;
 
 #ifdef OUTPUT 
   for (int i = 0; i < batch_size; i++) {
@@ -678,6 +680,7 @@ pair<size_t, size_t> Compute_Base_Skipping(graph<vertex>& G, std::vector<long> v
   while(!Frontier.isEmpty()){
     iteration++;
     totalActivated += Frontier.size();
+    cout << "iteration: " << Frontier.size() << ":: " << totalActivated << endl;
 
     // mode: no_dense, remove_duplicates (for batch size > 1)
     if (iteration > skipIter) {
@@ -693,6 +696,7 @@ pair<size_t, size_t> Compute_Base_Skipping(graph<vertex>& G, std::vector<long> v
       Frontier = Frontier_new;
     }
   }
+  cout << "Total iterations: " << iteration << endl;
 
 
 #ifdef OUTPUT 
@@ -853,6 +857,7 @@ pair<size_t, size_t> Compute_Delay_Skipping(graph<vertex>& G, std::vector<long> 
   while(!Frontier.isEmpty()){
     iteration++;
     totalActivated += Frontier.size();
+    cout << "iteration: " << Frontier.size() << ":: " << totalActivated << endl;
 
     // mode: no_dense, remove_duplicates (for batch size > 1)
     vertexSubset output = edgeMap(G, Frontier, DJ_SKIP_F(ShortestPathLen, batch_size), -1, no_dense|remove_duplicates);
