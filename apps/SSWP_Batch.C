@@ -322,6 +322,7 @@ pair<size_t, size_t> Compute_Base(graph<vertex>& G, std::vector<long> vecQueries
   while(!Frontier.isEmpty()){
     iteration++;
     totalActivated += Frontier.size();
+    cout << "iteration: " << Frontier.size() << ": " << totalActivated << endl;
     // cout << Frontier.size() << endl;
     // profiling
     if (should_profile) {
