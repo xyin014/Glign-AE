@@ -3448,9 +3448,12 @@ vector<pair<size_t, size_t>> bufferStreaming(graph<vertex>& G, std::vector<long>
       t_t1.start();
       for (int i = 0; i < bufferedQueries.size(); i=i+bSize) {
         std::vector<long> tmpBatch;
+        cout << "evalating queries: " << endl;
         for (int j = 0; j < bSize; j++) {
+          cout << bufferedQueries[i+j] << " ";
           tmpBatch.push_back(bufferedQueries[i+j]);
         }
+        cout << endl;
         pair<size_t, size_t> share_cnt = Compute_Base(G,tmpBatch,P,true);
         res.push_back(share_cnt);
         // cout << share_cnt.first << " " << share_cnt.second << endl;
