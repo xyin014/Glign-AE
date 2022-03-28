@@ -353,15 +353,15 @@ pair<size_t, size_t> Compute_Base(graph<vertex>& G, std::vector<long> vecQueries
     iteration++;
     totalActivated += Frontier.size();
     // cout << Frontier.size() << endl;
-    cout << "iteration: " << Frontier.size() << ": " << totalActivated << endl;
-    // profile edge activations.
-    Frontier.toDense();
-    for (IdxType i = 0; i < n; i++) {
-      if (Frontier.d[i]) {
-        long temp_degree =  G.V[i].getOutDegree();
-        total_edges += temp_degree;
-      }
-    }
+    cout << "iteration: " << Frontier.size() << endl;
+    // // profile edge activations.
+    // Frontier.toDense();
+    // for (IdxType i = 0; i < n; i++) {
+    //   if (Frontier.d[i]) {
+    //     long temp_degree =  G.V[i].getOutDegree();
+    //     total_edges += temp_degree;
+    //   }
+    // }
 
     // mode: no_dense, remove_duplicates (for batch size > 1)
     vertexSubset output = edgeMap(G, Frontier, DJ_F(ShortestPathLen, CurrActiveArray, NextActiveArray, batch_size), -1, no_dense|remove_duplicates);
@@ -406,7 +406,7 @@ pair<size_t, size_t> Compute_Base(graph<vertex>& G, std::vector<long> vecQueries
   pbbs::delete_array(CurrActiveArray, totalNumVertices);
   pbbs::delete_array(NextActiveArray, totalNumVertices);
   pbbs::delete_array(overlaps, batch_size);
-  return make_pair(total_edges, totalNoOverlap);
+  return make_pair(totalActivated, totalNoOverlap);
 }
 
 template <class vertex>
@@ -685,15 +685,15 @@ pair<size_t, size_t> Compute_Base_Skipping(graph<vertex>& G, std::vector<long> v
   while(!Frontier.isEmpty()){
     iteration++;
     totalActivated += Frontier.size();
-    cout << "iteration: " << Frontier.size() << ":: " << totalActivated << endl;
-    // profile edge activations.
-    Frontier.toDense();
-    for (IdxType i = 0; i < n; i++) {
-      if (Frontier.d[i]) {
-        long temp_degree =  G.V[i].getOutDegree();
-        total_edges += temp_degree;
-      }
-    }
+    cout << "iteration: " << Frontier.size() << endl;
+    // // profile edge activations.
+    // Frontier.toDense();
+    // for (IdxType i = 0; i < n; i++) {
+    //   if (Frontier.d[i]) {
+    //     long temp_degree =  G.V[i].getOutDegree();
+    //     total_edges += temp_degree;
+    //   }
+    // }
 
     // mode: no_dense, remove_duplicates (for batch size > 1)
     if (iteration > skipIter) {
@@ -727,7 +727,7 @@ pair<size_t, size_t> Compute_Base_Skipping(graph<vertex>& G, std::vector<long> v
 
   Frontier.del();
   pbbs::delete_array(ShortestPathLen, totalNumVertices);
-  return make_pair(total_edges, totalNoOverlap);
+  return make_pair(totalActivated, totalNoOverlap);
 }
 
 template <class vertex>
@@ -870,15 +870,15 @@ pair<size_t, size_t> Compute_Delay_Skipping(graph<vertex>& G, std::vector<long> 
   while(!Frontier.isEmpty()){
     iteration++;
     totalActivated += Frontier.size();
-    cout << "iteration: " << Frontier.size() << ":: " << totalActivated << endl;
-    // profile edge activations.
-    Frontier.toDense();
-    for (IdxType i = 0; i < n; i++) {
-      if (Frontier.d[i]) {
-        long temp_degree =  G.V[i].getOutDegree();
-        total_edges += temp_degree;
-      }
-    }
+    cout << "iteration: " << Frontier.size() << endl;
+    // // profile edge activations.
+    // Frontier.toDense();
+    // for (IdxType i = 0; i < n; i++) {
+    //   if (Frontier.d[i]) {
+    //     long temp_degree =  G.V[i].getOutDegree();
+    //     total_edges += temp_degree;
+    //   }
+    // }
 
     // mode: no_dense, remove_duplicates (for batch size > 1)
     vertexSubset output = edgeMap(G, Frontier, DJ_SKIP_F(ShortestPathLen, batch_size), -1, no_dense|remove_duplicates);
@@ -914,5 +914,5 @@ pair<size_t, size_t> Compute_Delay_Skipping(graph<vertex>& G, std::vector<long> 
 
   Frontier.del();
   pbbs::delete_array(ShortestPathLen, totalNumVertices);
-  return make_pair(total_edges, 0);
+  return make_pair(totalActivated, 0);
 }
