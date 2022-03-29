@@ -2090,36 +2090,50 @@ void test_4(int argc, char* argv[]) {
       cout << endl;
 
       // Sequential
+      long seq_cnt = 0;
       t_seq.start();
       for (int j = 0; j < tmp_batch.size(); j++) {
         vector<long> tmp_single_query;
         tmp_single_query.push_back(tmp_batch[j]);
-        Compute_Base(G,tmp_single_query,P);
+        // Compute_Base(G,tmp_single_query,P);
+        auto tmp_cnt = Compute_Base_Skipping(G,tmp_single_query,P,0);
+        seq_cnt += tmp_cnt.first;
       }
       t_seq.stop();
       double seq_time = t_seq.totalTime;
+      cout << "Sequential total activations: " << seq_cnt << endl;
 
       // Batching
+      long batch_cnt = 0;
       t_batch.start();
       for (int r = 0; r < rounds; r++) {
-        Compute_Base(G,tmp_batch,P);
-        // Compute_Delay(G,tmp_batch,P,dummy_dist);
+        // Compute_Base(G,tmp_batch,P);
+        auto tmp_cnt = Compute_Base_Skipping(G,tmp_batch,P,0);
+        batch_cnt = tmp_cnt.first;
       }
       t_batch.stop();
+      cout << "Baseline batching total activations: " << batch_cnt << endl;
+      cout << "Baseline batching affinity: " << 1.0*batch_cnt / seq_cnt << endl;
 
       vector<int> tmp_delay = {0, 0};
       int max_ind = distances[tmp_batch[0]] > distances[tmp_batch[1]] ? 0 : 1;
       int min_ind = distances[tmp_batch[0]] < distances[tmp_batch[1]] ? 0 : 1;
       vector<double> combined_spd;
+      vector<double> combined_affinity;
       for (int j = 0; j < max_delay; j++) {
         tmp_delay[min_ind] = j;
         cout << "No. " << min_ind << " delays " << j << " iterations\n";
+        long delay_cnt = 0;
         timer t_delay; t_delay.start();
-        Compute_Delay(G,tmp_batch,P,tmp_delay);
+        // Compute_Delay(G,tmp_batch,P,tmp_delay);
+        auto tmp_cnt = Compute_Delay_Skipping(G,tmp_batch,P,tmp_delay);
+
         // Compute_Base(G,tmp_batch,P);
         t_delay.stop();
+        delay_cnt = tmp_cnt.first;
         double delay_time = t_delay.totalTime;
         combined_spd.push_back(seq_time / delay_time);
+        combined_affinity.push_back(1.0*delay_cnt / seq_cnt);
         cout << "delayed query time: " << delay_time << endl;
         cout << "Delayed Eval Speedup: " << seq_time / delay_time << endl;
       }
@@ -2146,9 +2160,9 @@ void test_4(int argc, char* argv[]) {
       for (int j = 0; j < dist_to_high.size(); j++) {
         dist_to_high[j] = max_dist_to_high - dist_to_high[j];
         total_delays += dist_to_high[j];
-        cout << "No. " << j << " defer " << dist_to_high[j] << " iterations\n";
+        // cout << "No. " << j << " defer " << dist_to_high[j] << " iterations\n";
       }
-      cout << "Total delays (delta): " << total_delays << endl;
+      // cout << "Total delays (delta): " << total_delays << endl;
 
       // t_delay.start();
       // for (int r = 0; r < rounds; r++) {
@@ -2156,8 +2170,6 @@ void test_4(int argc, char* argv[]) {
       //   // Compute_Base(G,tmp_batch,P);
       // }
       // t_delay.stop();
-
-
       
       double batch_time = t_batch.totalTime / rounds;
       t_seq.reportTotal("sequential time");
@@ -2171,26 +2183,32 @@ void test_4(int argc, char* argv[]) {
         cout << combined_spd[j] << " ";
       }
       cout << endl;
+      cout << "Combined results for affinity: ";
+      for (int j = 0; j < combined_spd.size(); j++) {
+        cout << combined_affinity[j] << " ";
+      }
+      cout << endl;
 
       int best_delay = -1;
       double best_spd = 0.0;
+      double best_affinity = 0.0;
       for (int j = 0; j < combined_spd.size(); j++) {
         if (combined_spd[j] > best_spd) {
           best_spd = combined_spd[j];
+          best_affinity = combined_affinity[j];
           best_delay = j;
         }
       }
       int tmp_delta = abs(dist_to_high[0] - dist_to_high[1]);
-      cout << "Best delay: " << best_delay << " " << best_spd  << endl;
-      cout << "Delta_Speedup: " << tmp_delta << " " << combined_spd[tmp_delta] << endl;
+      cout << "Best delay: " << best_delay << " " << best_spd  << " " << best_affinity << endl;
+      cout << "Delta_Speedup: " << tmp_delta << " " << combined_spd[tmp_delta] << " " << combined_affinity[tmp_delta] << endl;
 
-
-      // To do: remove
-      for (int j = 0; j < tmp_batch.size(); j++) {
-        vector<long> tmp_single_query;
-        tmp_single_query.push_back(tmp_batch[j]);
-        Compute_Base(G,tmp_single_query,P, true);
-      }
+      // // To do: remove
+      // for (int j = 0; j < tmp_batch.size(); j++) {
+      //   vector<long> tmp_single_query;
+      //   tmp_single_query.push_back(tmp_batch[j]);
+      //   Compute_Base(G,tmp_single_query,P, true);
+      // }
 
       cout << "=================\n";
     }
