@@ -2014,7 +2014,8 @@ void test_4(int argc, char* argv[]) {
   std::random_device rd;
   auto rng = std::default_random_engine { rd() };
   // auto rng = std::default_random_engine {};
-  std::shuffle(std::begin(userQueries), std::end(userQueries), rng);
+  // shouldn't shuffle.
+  // std::shuffle(std::begin(userQueries), std::end(userQueries), rng);
 
   cout << "number of random queries: " << userQueries.size() << endl;
   int batch_size = userQueries.size();

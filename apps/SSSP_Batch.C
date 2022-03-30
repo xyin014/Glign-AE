@@ -353,7 +353,7 @@ pair<size_t, size_t> Compute_Base(graph<vertex>& G, std::vector<long> vecQueries
     iteration++;
     totalActivated += Frontier.size();
     // cout << Frontier.size() << endl;
-    cout << "iteration: " << Frontier.size() << endl;
+    // cout << "iteration: " << Frontier.size() << endl;
     // // profile edge activations.
     // Frontier.toDense();
     // for (IdxType i = 0; i < n; i++) {
@@ -871,7 +871,7 @@ pair<size_t, size_t> Compute_Delay_Skipping(graph<vertex>& G, std::vector<long> 
     iteration++;
     totalActivated += Frontier.size();
     // cout << "iteration: " << Frontier.size() << endl;
-    
+
     // // profile edge activations.
     // Frontier.toDense();
     // for (IdxType i = 0; i < n; i++) {
