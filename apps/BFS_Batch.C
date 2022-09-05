@@ -44,13 +44,11 @@ struct BFSLV_F {
       if (CurrActiveArray[s_begin + j]) {
         uintE newValue = Levels[s_begin + j] + 1;
         if (Levels[d_begin + j] > newValue) {
-          // Visited[d_begin + j] = true;
           Levels[d_begin + j] = newValue;
           NextActiveArray[d_begin + j] = true;
           ret = true;
         }
       }
-
     }
     return ret;
   }
@@ -88,7 +86,6 @@ struct BFSLV_SKIP_F {
     for (long j = 0; j < BatchSize; j++) {
       uintE newValue = Levels[s_begin + j] + 1;
       if (Levels[d_begin + j] > newValue) {
-        // Visited[d_begin + j] = true;
         Levels[d_begin + j] = newValue;
         ret = true;
       }
@@ -118,7 +115,7 @@ uintE* Compute_Eval(graph<vertex>& G, std::vector<long> vecQueries, commandLine 
   size_t edge_count = G.m;
   long batch_size = vecQueries.size();
   IdxType totalNumVertices = (IdxType)n * (IdxType)batch_size;
-  uintE* Levels = pbbs::new_array<uintE>(totalNumVertices);
+  uintE* Hops = pbbs::new_array<uintE>(totalNumVertices);
   bool* CurrActiveArray = pbbs::new_array<bool>(totalNumVertices);
   bool* NextActiveArray = pbbs::new_array<bool>(totalNumVertices);
   bool* frontier = pbbs::new_array<bool>(n);
@@ -129,12 +126,12 @@ uintE* Compute_Eval(graph<vertex>& G, std::vector<long> vecQueries, commandLine 
     frontier[vecQueries[i]] = true;
   }
   parallel_for(IdxType i = 0; i < totalNumVertices; i++) {
-    Levels[i] = (uintE)MAXLEVEL;
+    Hops[i] = (uintE)MAXLEVEL;
     CurrActiveArray[i] = false;
     NextActiveArray[i] = false;
   }
   for(long i = 0; i < batch_size; i++) {
-    Levels[(IdxType)batch_size * (IdxType)vecQueries[i] + (IdxType)i] = 0;
+    Hops[(IdxType)batch_size * (IdxType)vecQueries[i] + (IdxType)i] = 0;
   }
   parallel_for(size_t i = 0; i < batch_size; i++) {
     CurrActiveArray[(IdxType)vecQueries[i] * (IdxType)batch_size + (IdxType)i] = true;
@@ -143,7 +140,7 @@ uintE* Compute_Eval(graph<vertex>& G, std::vector<long> vecQueries, commandLine 
   vertexSubset Frontier(n, frontier);
   while(!Frontier.isEmpty()){
     // mode: no_dense, remove_duplicates (for batch size > 1)
-    vertexSubset output = edgeMap(G, Frontier, BFSLV_F(Levels, CurrActiveArray, NextActiveArray, batch_size), -1, no_dense|remove_duplicates);
+    vertexSubset output = edgeMap(G, Frontier, BFSLV_F(Hops, CurrActiveArray, NextActiveArray, batch_size), -1, no_dense|remove_duplicates);
 
     Frontier.del();
     Frontier = output;
@@ -157,60 +154,7 @@ uintE* Compute_Eval(graph<vertex>& G, std::vector<long> vecQueries, commandLine 
   Frontier.del();
   pbbs::delete_array(CurrActiveArray, totalNumVertices);
   pbbs::delete_array(NextActiveArray, totalNumVertices);
-  return Levels;
-}
-
-template <class vertex>
-uintE* Compute_Eval_Prop(graph<vertex>& G, std::vector<long> vecQueries, commandLine P) {
-  size_t n = G.n;
-  size_t edge_count = G.m;
-  long batch_size = vecQueries.size();
-  IdxType totalNumVertices = (IdxType)n * (IdxType)batch_size;
-  uintE* Levels = pbbs::new_array<uintE>(totalNumVertices);
-  bool* CurrActiveArray = pbbs::new_array<bool>(totalNumVertices);
-  bool* NextActiveArray = pbbs::new_array<bool>(totalNumVertices);
-  bool* frontier = pbbs::new_array<bool>(n);
-  parallel_for(size_t i = 0; i < n; i++) {
-    frontier[i] = false;
-  }
-  for(long i = 0; i < batch_size; i++) {
-    frontier[vecQueries[i]] = true;
-  }
-  parallel_for(IdxType i = 0; i < totalNumVertices; i++) {
-    Levels[i] = (intE)MAXLEVEL;
-    CurrActiveArray[i] = false;
-    NextActiveArray[i] = false;
-  }
-  for(long i = 0; i < batch_size; i++) {
-    Levels[(IdxType)batch_size * (IdxType)vecQueries[i] + (IdxType)i] = 0;
-  }
-  parallel_for(size_t i = 0; i < batch_size; i++) {
-    CurrActiveArray[(IdxType)vecQueries[i] * (IdxType)batch_size + (IdxType)i] = true;
-  }
-
-  vertexSubset Frontier(n, frontier);
-  while(!Frontier.isEmpty()){
-    // mode: no_dense, remove_duplicates (for batch size > 1)
-    vertexSubset output = edgeMap(G, Frontier, BFSLV_F(Levels, CurrActiveArray, NextActiveArray, batch_size), -1, no_dense|remove_duplicates);
-
-    Frontier.del();
-    Frontier = output;
-
-    std::swap(CurrActiveArray, NextActiveArray);
-    parallel_for(IdxType i = 0; i < totalNumVertices; i++) {
-      NextActiveArray[i] = false;
-    }
-  }
-
-  Frontier.del();
-  pbbs::delete_array(CurrActiveArray, totalNumVertices);
-  pbbs::delete_array(NextActiveArray, totalNumVertices);
-  uintE* ret = pbbs::new_array<uintE>(totalNumVertices);
-  parallel_for(size_t i = 0; i < totalNumVertices; i++) {
-    ret[i] = (uintE)Levels[i];
-  }
-  pbbs::delete_array(Levels, totalNumVertices);
-  return ret;
+  return Hops;
 }
 
 template <class vertex>
@@ -246,32 +190,11 @@ pair<size_t, size_t> Compute_Base(graph<vertex>& G, std::vector<long> vecQueries
   // for profiling
   long iteration = 0;
   size_t totalActivated = 0;
-  vector<pair<size_t, double>> affinity_tracking;
-  vector<pair<size_t, double>> affinity_tracking_one;
-  vector<pair<size_t, double>> affinity_tracking_only;
-  size_t* overlaps = pbbs::new_array<size_t>(batch_size);
-
-  for (int i = 0; i < batch_size; i++) {
-    overlaps[i] = 0;
-  }
-
-  vector<double> overlap_scores;
-  size_t accumulated_overlap = 0;
-  size_t accumulated_overlap_one = 0;
-  size_t accumulated_overlap_only= 0;
-  size_t peak_activation = 0;
-  int peak_iter = 0;
 
   while(!Frontier.isEmpty()){
     iteration++;
     totalActivated += Frontier.size();
-    // cout << Frontier.size() << endl;
     // cout << "iteration: " << Frontier.size() << ": " << totalActivated << endl;
-    // profiling
-    if (should_profile) {
-      
-    }
-
     // mode: no_dense, remove_duplicates (for batch size > 1)
     vertexSubset output = edgeMap(G, Frontier, BFSLV_F(Levels, CurrActiveArray, NextActiveArray, batch_size), -1, no_dense|remove_duplicates);
 
@@ -283,13 +206,6 @@ pair<size_t, size_t> Compute_Base(graph<vertex>& G, std::vector<long> vecQueries
       NextActiveArray[i] = false;
     }
   }
-  
-  // cout << endl;
-  // profiling
-  if (should_profile) {
-    
-  }
-
 #ifdef OUTPUT 
   for (int i = 0; i < batch_size; i++) {
     long start = vecQueries[i];
@@ -306,7 +222,6 @@ pair<size_t, size_t> Compute_Base(graph<vertex>& G, std::vector<long> vecQueries
   Frontier.del();
   pbbs::delete_array(CurrActiveArray, totalNumVertices);
   pbbs::delete_array(NextActiveArray, totalNumVertices);
-  pbbs::delete_array(overlaps, batch_size);
   pbbs::delete_array(Levels, totalNumVertices);
   return make_pair(totalActivated, 0);
 }
@@ -322,7 +237,7 @@ pair<size_t, size_t> Compute_Separate(graph<vertex>& G, std::vector<long> vecQue
 }
 
 template <class vertex>
-pair<size_t, size_t> Compute_Base_Skipping(graph<vertex>& G, std::vector<long> vecQueries, commandLine P, int skipIter, bool should_profile) {
+pair<size_t, size_t> Compute_Base_Skipping(graph<vertex>& G, std::vector<long> vecQueries, commandLine P, bool should_profile) {
   size_t n = G.n;
   size_t edge_count = G.m;
   long batch_size = vecQueries.size();
@@ -351,8 +266,7 @@ pair<size_t, size_t> Compute_Base_Skipping(graph<vertex>& G, std::vector<long> v
   while(!Frontier.isEmpty()){
     iteration++;
     totalActivated += Frontier.size();
-    // cout << "iteration: " << Frontier.size() << ": " << totalActivated << endl;
-    
+    // cout << "iteration: " << iteration << ": " << Frontier.size() << endl;
     // mode: no_dense, remove_duplicates (for batch size > 1)
     vertexSubset output = edgeMap(G, Frontier, BFSLV_SKIP_F(Levels, batch_size), -1, no_dense|remove_duplicates);
     
@@ -365,7 +279,6 @@ pair<size_t, size_t> Compute_Base_Skipping(graph<vertex>& G, std::vector<long> v
     vertexSubset Frontier_new(n, new_d);
     Frontier.del();
     Frontier = Frontier_new;
-
   }
 
 #ifdef OUTPUT 
