@@ -140,118 +140,98 @@ struct Heterogeneous_F {
         IdxType s_begin = s * BatchSize;
         IdxType d_begin = d * BatchSize;
         for (long j = 0; j < BatchSize; j++) {
-            if (CurrActiveArray[s_begin + j] == benchmark_sssp) {
-                // Extract original values resides in the value array
-                intE sValue = QueryValues[s_begin + j];
-                intE dValue = QueryValues[d_begin + j];
-                // Relax the numeric value of vertex d
-                intE newDist = sValue + edgeLen;  // edgeLen = 1
-                if (dValue > newDist) {
-                    QueryValues[d_begin + j] = newDist;
-                    NextActiveArray[d_begin + j] = benchmark_sssp;
-                    ret = true;
-                }
-                continue;
-            } else if (CurrActiveArray[s_begin + j] == benchmark_bfs) {
-                intE sValue = QueryValues[s_begin + j];
-                intE dValue = QueryValues[d_begin + j];
-                // Relax the numeric value of vertex d
-                intE newDist = sValue + 1;  // edgeLen = 1
-
-                if (dValue > newDist) {
-                    QueryValues[d_begin + j] = newDist;
-                    NextActiveArray[d_begin + j] = benchmark_bfs;
-                    ret = true;
-                }
-                continue;
-            } else if (CurrActiveArray[s_begin + j] == benchmark_sswp) {
-                // Extract original values resides in the value array
-                intE sValue = QueryValues[s_begin + j];
-                intE dValue = QueryValues[d_begin + j];
-                // Relax the numeric value of vertex d
-                intE newWidth = std::min(sValue, edgeLen);
-                // Propagation of value and case of hub vertex.
-                if (dValue < newWidth) {
-                    QueryValues[d_begin + j] = newWidth;
-                    NextActiveArray[d_begin + j] = benchmark_sswp;
-                    ret = true;
-                }
-                continue;
-            }  else if (CurrActiveArray[s_begin + j] == benchmark_ssnp) {
-                // Extract original values resides in the value array
-                intE sValue = QueryValues[s_begin + j];
-                intE dValue = QueryValues[d_begin + j];
-                // Relax the numeric value of vertex d
-                intE newWidth = std::max(sValue, edgeLen);
-                // Propagation of value and case of hub vertex.
-                if (dValue > newWidth) {
-                    QueryValues[d_begin + j] = newWidth;
-                    NextActiveArray[d_begin + j] = benchmark_ssnp;
-                    ret = true;
-                }
-                continue;
-            } 
+          if (CurrActiveArray[s_begin + j] == benchmark_sssp) {
+            intE sValue = QueryValues[s_begin + j];
+            intE dValue = QueryValues[d_begin + j];
+            intE newDist = sValue + edgeLen;
+            if (dValue > newDist) {
+                QueryValues[d_begin + j] = newDist;
+                NextActiveArray[d_begin + j] = benchmark_sssp;
+                ret = true;
+            }
+            continue;
+          } else if (CurrActiveArray[s_begin + j] == benchmark_bfs) {
+            intE sValue = QueryValues[s_begin + j];
+            intE dValue = QueryValues[d_begin + j];
+            intE newDist = sValue + 1;
+            if (dValue > newDist) {
+                QueryValues[d_begin + j] = newDist;
+                NextActiveArray[d_begin + j] = benchmark_bfs;
+                ret = true;
+            }
+            continue;
+          } else if (CurrActiveArray[s_begin + j] == benchmark_sswp) {
+            intE sValue = QueryValues[s_begin + j];
+            intE dValue = QueryValues[d_begin + j];
+            intE newWidth = std::min(sValue, edgeLen);
+            if (dValue < newWidth) {
+                QueryValues[d_begin + j] = newWidth;
+                NextActiveArray[d_begin + j] = benchmark_sswp;
+                ret = true;
+            }
+            continue;
+          } else if (CurrActiveArray[s_begin + j] == benchmark_ssnp) {
+            intE sValue = QueryValues[s_begin + j];
+            intE dValue = QueryValues[d_begin + j];
+            intE newWidth = std::max(sValue, edgeLen);
+            if (dValue > newWidth) {
+                QueryValues[d_begin + j] = newWidth;
+                NextActiveArray[d_begin + j] = benchmark_ssnp;
+                ret = true;
+            }
+            continue;
+          }
         }
         return ret;
     }
 
     inline bool updateAtomic(uintE s, uintE d, intE edgeLen=1) {
-        bool ret = false;
-        IdxType s_begin = s * BatchSize;
-        IdxType d_begin = d * BatchSize;
-        for (long j = 0; j < BatchSize; j++) {
-            auto cur_active = CurrActiveArray[s_begin + j];
-            if (cur_active == benchmark_sssp) {
-                // Extract original values resides in the value array
-                intE sValue = QueryValues[s_begin + j];
-                // Relax the numeric value of vertex d
-                intE newDist = sValue + edgeLen;  // edgeLen = 1
-                if (writeMin(&QueryValues[d_begin + j], newDist)
-                        && CAS(&NextActiveArray[d_begin + j], _empty, benchmark_sssp)) {
-                    ret = true;
-                }
-                continue;
-            } else if (cur_active == benchmark_bfs) {
-                    // Extract original values resides in the value array
-                    intE sValue = QueryValues[s_begin + j];
-                    // Relax the numeric value of vertex d
-                    intE newDist = sValue + 1;  // edgeLen = 1
-                    if (writeMin(&QueryValues[d_begin + j], newDist)
-                            && CAS(&NextActiveArray[d_begin + j], _empty, benchmark_bfs)) {
-                        ret = true;
-                    }
-                    continue;
-            } else if (cur_active == benchmark_sswp) {
-                // Extract original values resides in the value array
-                intE sValue = QueryValues[s_begin + j];
-                // Relax the numeric value of vertex d
-                intE newWidth = std::min(sValue, edgeLen);
-                // Propagation of value and case of hub vertex.
-                if (writeMax(&QueryValues[d_begin + j], newWidth)
-                        && CAS(&NextActiveArray[d_begin + j], _empty, benchmark_sswp)) {
-                    ret = true;
-                }
-                continue;
-            } else if (cur_active == benchmark_ssnp) {
-                // Extract original values resides in the value array
-                intE sValue = QueryValues[s_begin + j];
-                // Relax the numeric value of vertex d
-                intE newWidth = std::max(sValue, edgeLen);
-                // Propagation of value and case of hub vertex.
-                if (writeMin(&QueryValues[d_begin + j], newWidth)
-                        && CAS(&NextActiveArray[d_begin + j], _empty, benchmark_ssnp)) {
-                    ret = true;
-                }
-                continue;
-            } 
+      bool ret = false;
+      IdxType s_begin = s * BatchSize;
+      IdxType d_begin = d * BatchSize;
+      for (long j = 0; j < BatchSize; j++) {
+        auto cur_active = CurrActiveArray[s_begin + j];
+        if (cur_active == benchmark_sssp) {
+          intE sValue = QueryValues[s_begin + j];
+          intE newDist = sValue + edgeLen;
+          if (writeMin(&QueryValues[d_begin + j], newDist)
+                  && CAS(&NextActiveArray[d_begin + j], _empty, benchmark_sssp)) {
+              ret = true;
+          }
+          continue;
+        } else if (cur_active == benchmark_bfs) {
+          intE sValue = QueryValues[s_begin + j];
+          intE newDist = sValue + 1;
+          if (writeMin(&QueryValues[d_begin + j], newDist)
+                  && CAS(&NextActiveArray[d_begin + j], _empty, benchmark_bfs)) {
+              ret = true;
+          }
+          continue;
+        } else if (cur_active == benchmark_sswp) {
+          intE sValue = QueryValues[s_begin + j];
+          intE newWidth = std::min(sValue, edgeLen);
+          if (writeMax(&QueryValues[d_begin + j], newWidth)
+                  && CAS(&NextActiveArray[d_begin + j], _empty, benchmark_sswp)) {
+              ret = true;
+          }
+          continue;
+        } else if (cur_active == benchmark_ssnp) {
+          intE sValue = QueryValues[s_begin + j];
+          intE newWidth = std::max(sValue, edgeLen);
+          if (writeMin(&QueryValues[d_begin + j], newWidth)
+                  && CAS(&NextActiveArray[d_begin + j], _empty, benchmark_ssnp)) {
+              ret = true;
+          }
+          continue;
         }
-        return ret;
+      }
+      return ret;
     }
 
     inline bool cond_true (int d) { return 1; }
 
     inline bool cond(uintE d) {
-        return cond_true(d);
+      return cond_true(d);
     }
 };
 
@@ -264,132 +244,108 @@ struct Heterogeneous_SKIP_F {
       QueryValues(_QueryValues), BatchSize(_BatchSize), typeArray(_typeArray) {}
 
     inline bool update(uintE s, uintE d, intE edgeLen=1) {
-        bool ret = false;
-        IdxType s_begin = s * BatchSize;
-        IdxType d_begin = d * BatchSize;
-        for (long j = 0; j < BatchSize; j++) {
-            if (typeArray[j] == benchmark_sssp) 
-            {
-                // Extract original values resides in the value array
-                intE sValue = QueryValues[s_begin + j];
-                intE dValue = QueryValues[d_begin + j];
-                // Relax the numeric value of vertex d
-                intE newDist = sValue + edgeLen;  // edgeLen = 1
-                if (dValue > newDist) {
-                    QueryValues[d_begin + j] = newDist;
-                    // NextActiveArray[d_begin + j] = benchmark_sssp;
-                    ret = true;
-                }
-                continue;
-            } 
-            else if (typeArray[j] == benchmark_bfs) 
-            {
-                intE sValue = QueryValues[s_begin + j];
-                intE dValue = QueryValues[d_begin + j];
-                // Relax the numeric value of vertex d
-                intE newDist = sValue + 1;  // edgeLen = 1
+      bool ret = false;
+      IdxType s_begin = s * BatchSize;
+      IdxType d_begin = d * BatchSize;
+      for (long j = 0; j < BatchSize; j++) {
+        if (typeArray[j] == benchmark_sssp) 
+        {
+          intE sValue = QueryValues[s_begin + j];
+          intE dValue = QueryValues[d_begin + j];
+          intE newDist = sValue + edgeLen;
+          if (dValue > newDist) {
+              QueryValues[d_begin + j] = newDist;
+              ret = true;
+          }
+          continue;
+        } 
+        else if (typeArray[j] == benchmark_bfs) 
+        {
+          intE sValue = QueryValues[s_begin + j];
+          intE dValue = QueryValues[d_begin + j];
+          intE newDist = sValue + 1;
 
-                if (dValue > newDist) {
-                    QueryValues[d_begin + j] = newDist;
-                    // NextActiveArray[d_begin + j] = benchmark_bfs;
-                    ret = true;
-                }
-                continue;
-            } 
-            else if (typeArray[j] == benchmark_sswp) 
-            {
-                // Extract original values resides in the value array
-                intE sValue = QueryValues[s_begin + j];
-                intE dValue = QueryValues[d_begin + j];
-                // Relax the numeric value of vertex d
-                intE newWidth = std::min(sValue, edgeLen);
-                // Propagation of value and case of hub vertex.
-                if (dValue < newWidth) {
-                    QueryValues[d_begin + j] = newWidth;
-                    // NextActiveArray[d_begin + j] = benchmark_sswp;
-                    ret = true;                    
-                }
-                continue;
-            }  
-            else if (typeArray[j] == benchmark_ssnp) 
-            {
-                // Extract original values resides in the value array
-                intE sValue = QueryValues[s_begin + j];
-                intE dValue = QueryValues[d_begin + j];
-                // Relax the numeric value of vertex d
-                intE newWidth = std::max(sValue, edgeLen);
-                // Propagation of value and case of hub vertex.
-                if (dValue > newWidth) {
-                    QueryValues[d_begin + j] = newWidth;
-                    // NextActiveArray[d_begin + j] = benchmark_sswp;
-                    ret = true;                    
-                }
-                continue;
-            } 
-        }
-        return ret;
+          if (dValue > newDist) {
+              QueryValues[d_begin + j] = newDist;
+              ret = true;
+          }
+          continue;
+        } 
+        else if (typeArray[j] == benchmark_sswp) 
+        {
+          intE sValue = QueryValues[s_begin + j];
+          intE dValue = QueryValues[d_begin + j];
+          intE newWidth = std::min(sValue, edgeLen);
+          if (dValue < newWidth) {
+              QueryValues[d_begin + j] = newWidth;
+              ret = true;                    
+          }
+          continue;
+        }  
+        else if (typeArray[j] == benchmark_ssnp) 
+        {
+          intE sValue = QueryValues[s_begin + j];
+          intE dValue = QueryValues[d_begin + j];
+          intE newWidth = std::max(sValue, edgeLen);
+          if (dValue > newWidth) {
+              QueryValues[d_begin + j] = newWidth;
+              ret = true;                    
+          }
+          continue;
+        } 
+      }
+      return ret;
     }
 
     inline bool updateAtomic(uintE s, uintE d, intE edgeLen=1) {
-        bool ret = false;
-        IdxType s_begin = s * BatchSize;
-        IdxType d_begin = d * BatchSize;
-        for (long j = 0; j < BatchSize; j++) {
-            // auto cur_active = CurrActiveArray[s_begin + j];
-            if (typeArray[j] == benchmark_sssp) 
-            {
-              // Extract original values resides in the value array
-              intE sValue = QueryValues[s_begin + j];
-              // Relax the numeric value of vertex d
-              intE newDist = sValue + edgeLen;  // edgeLen = 1
-              if (writeMin(&QueryValues[d_begin + j], newDist)) {
-                  ret = true;
-              }
-              continue;
-            } 
-            else if (typeArray[j] == benchmark_bfs) 
-            {
-              // Extract original values resides in the value array
-              intE sValue = QueryValues[s_begin + j];
-              // Relax the numeric value of vertex d
-              intE newDist = sValue + 1;  // edgeLen = 1
-              if (writeMin(&QueryValues[d_begin + j], newDist)) {
-                  ret = true;
-              }
-              continue;
-            } 
-            else if (typeArray[j] == benchmark_sswp) 
-            {
-              // Extract original values resides in the value array
-              intE sValue = QueryValues[s_begin + j];
-              // Relax the numeric value of vertex d
-              intE newWidth = std::min(sValue, edgeLen);
-              // Propagation of value and case of hub vertex.
-              if (writeMax(&QueryValues[d_begin + j], newWidth)) {
-                  ret = true;
-              }
-              continue;
-            } 
-            else if (typeArray[j] == benchmark_ssnp) 
-            {
-              // Extract original values resides in the value array
-              intE sValue = QueryValues[s_begin + j];
-              // Relax the numeric value of vertex d
-              intE newWidth = std::max(sValue, edgeLen);
-              // Propagation of value and case of hub vertex.
-              if (writeMin(&QueryValues[d_begin + j], newWidth)) {
-                  ret = true;
-              }
-              continue;
-            } 
-        }
-        return ret;
+      bool ret = false;
+      IdxType s_begin = s * BatchSize;
+      IdxType d_begin = d * BatchSize;
+      for (long j = 0; j < BatchSize; j++) {
+        if (typeArray[j] == benchmark_sssp) 
+        {
+          intE sValue = QueryValues[s_begin + j];
+          intE newDist = sValue + edgeLen;
+          if (writeMin(&QueryValues[d_begin + j], newDist)) {
+              ret = true;
+          }
+          continue;
+        } 
+        else if (typeArray[j] == benchmark_bfs) 
+        {
+          intE sValue = QueryValues[s_begin + j];
+          intE newDist = sValue + 1;
+          if (writeMin(&QueryValues[d_begin + j], newDist)) {
+              ret = true;
+          }
+          continue;
+        } 
+        else if (typeArray[j] == benchmark_sswp) 
+        {
+          intE sValue = QueryValues[s_begin + j];
+          intE newWidth = std::min(sValue, edgeLen);
+          if (writeMax(&QueryValues[d_begin + j], newWidth)) {
+              ret = true;
+          }
+          continue;
+        } 
+        else if (typeArray[j] == benchmark_ssnp) 
+        {
+          intE sValue = QueryValues[s_begin + j];
+          intE newWidth = std::max(sValue, edgeLen);
+          if (writeMin(&QueryValues[d_begin + j], newWidth)) {
+              ret = true;
+          }
+          continue;
+        } 
+      }
+      return ret;
     }
 
     inline bool cond_true (int d) { return 1; }
 
     inline bool cond(uintE d) {
-        return cond_true(d);
+      return cond_true(d);
     }
 };
 
@@ -441,21 +397,6 @@ uintE* Compute_Eval(graph<vertex>& G, std::vector<long> vecQueries, commandLine 
   return Levels;
 }
 
-template <class vertex>
-uintE* Compute_Eval_Prop(graph<vertex>& G, std::vector<long> vecQueries, commandLine P) {
-  size_t n = G.n;
-  size_t edge_count = G.m;
-  long batch_size = vecQueries.size();
-  IdxType totalNumVertices = (IdxType)n * (IdxType)batch_size;
-
-  uintE* ret = pbbs::new_array<uintE>(totalNumVertices);
-  return ret;
-}
-
-template <class vertex>
-void Compute_Base(graph<vertex>& G, std::vector<long> vecQueries, commandLine P, bool should_profile) {
-
-}
 
 template <class vertex>
 pair<size_t, size_t> Compute_Heter_Base(graph<vertex>& G, std::vector<pair<long, benchmarkType>> vecQueries, commandLine P, bool should_profile) {
@@ -592,21 +533,6 @@ pair<size_t, size_t> Compute_Heter_Skip(graph<vertex>& G, std::vector<pair<long,
     typeArray[i] = vecQueries[i].second;
   }
 
-  // parallel_for(IdxType i = 0; i < totalNumVertices; i++) {
-  //   CurrActiveArray[i] = _empty;
-  //   NextActiveArray[i] = _empty;
-  // }
-  // parallel_for(IdxType i = 0; i < batch_size; i++) {
-  //   if (vecQueries[i].second & benchmark_sssp) {
-  //     CurrActiveArray[(IdxType)vecQueries[i].first * (IdxType)batch_size + (IdxType)i] = benchmark_sssp;
-  //   } else if (vecQueries[i].second & benchmark_bfs) {
-  //     CurrActiveArray[(IdxType)vecQueries[i].first * (IdxType)batch_size + (IdxType)i] = benchmark_bfs;
-  //   } else if (vecQueries[i].second & benchmark_sswp) {
-  //     CurrActiveArray[(IdxType)vecQueries[i].first * (IdxType)batch_size + (IdxType)i] = benchmark_sswp;
-  //   } else if (vecQueries[i].second & benchmark_ssnp) {
-  //     CurrActiveArray[(IdxType)vecQueries[i].first * (IdxType)batch_size + (IdxType)i] = benchmark_ssnp;
-  //   }
-  // }
   for(long i = 0; i < batch_size; i++) {
     if (vecQueries[i].second & benchmark_sssp) {
       parallel_for(size_t j = 0; j < n; j++) {
@@ -649,30 +575,14 @@ pair<size_t, size_t> Compute_Heter_Skip(graph<vertex>& G, std::vector<pair<long,
   while(!Frontier.isEmpty()){
     iteration++;
     totalActivated += Frontier.size();
-    // cout << iteration << endl;
-
     // mode: no_dense, remove_duplicates (for batch size > 1)
     vertexSubset output = edgeMap(G, Frontier, Heterogeneous_SKIP_F(QueryValues, batch_size, typeArray), -1, no_dense|remove_duplicates);
-    // vertexSubset output = edgeMapDense(G, Frontier, Heterogeneous_SKIP_F(QueryValues, batch_size, typeArray), 0);
 
     Frontier.del();
     Frontier = output;
 
     Frontier.toDense();
-    // bool* new_d = Frontier.d;
-    // Frontier.d = nullptr;
-    // vertexSubset Frontier_new(n, new_d);
-    // Frontier.del();
-    // Frontier = Frontier_new;
-
-    // std::swap(CurrActiveArray, NextActiveArray);
-    // parallel_for(IdxType i = 0; i < totalNumVertices; i++) {
-    //   NextActiveArray[i] = false;
-    // }
-  }
-
-  // profiling
-  
+  }  
 #ifdef OUTPUT 
   for (int i = 0; i < batch_size; i++) {
     long start = vecQueries[i].first;
@@ -798,5 +708,3 @@ void Compute_Delay(graph<vertex>&, vector<long>, commandLine, vector<int>, bool 
 
   return;
 }
-
-
