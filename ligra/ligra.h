@@ -1029,7 +1029,6 @@ void ligra_c(int argc, char* argv[]) {
 
     // start streaming.
     // input: G, P, bufferedQueries, batch size
-    long selection = P.getOptionLongValue("-order",1);
     vector<pair<size_t,size_t>> share1;
     vector<pair<size_t,size_t>> share_unsorted;
     vector<pair<size_t,size_t>> share_sorted;
@@ -1059,7 +1058,6 @@ void ligra_c(int argc, char* argv[]) {
     
     // start streaming.
     // input: G, P, bufferedQueries, batch size
-    long selection = P.getOptionLongValue("-order",1);
     vector<pair<size_t,size_t>> share1;
     vector<pair<size_t,size_t>> share_unsorted;
     vector<pair<size_t,size_t>> share_sorted;
