@@ -1574,8 +1574,8 @@ int parallel_main(int argc, char* argv[]) {
   }
 
   if (options == "ibfs") {
-    cout << "running reordering based on out-degrees\n";
-    iBFS(argc, argv);  // reordering
+    cout << "running iBFS heuristic\n";
+    iBFS(argc, argv);
   }
 
   if (options == "ground-truth") {
