@@ -1,0 +1,8 @@
+# Ignore all
+apps/*
+
+# Unignore all with extensions
+!apps/*.*
+
+# # Unignore all dirs
+# !*/
