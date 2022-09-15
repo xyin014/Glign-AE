@@ -1,7 +1,5 @@
-// This code is part of the project "Ligra: A Lightweight Graph Processing
-// Framework for Shared Memory", presented at Principles and Practice of 
-// Parallel Programming, 2013.
-// Copyright (c) 2013 Julian Shun and Guy Blelloch
+// This code is part of the project "Glign: Taming Misaligned Graph Traversals in Concurrent Graph Processing"
+// Copyright (c) 2022 Xizhe Yin
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
 // copy of this software and associated documentation files (the

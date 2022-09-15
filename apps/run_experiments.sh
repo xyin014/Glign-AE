@@ -8,7 +8,7 @@ date
 name=$1
 graph_path=$2
 query_file=$3
-output_path=$4
+output_path=../results/${name}
 
 # name=LJ
 # graph_path=~/bigdata/data/soc-LiveJournal1.weighted.adj
