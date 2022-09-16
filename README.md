@@ -32,7 +32,8 @@ $ ./SSSP_Batch -option glign -batch 64 -max_combination 512 -mode 3 -delay -qf [
 The above will evaluate 512 queries in 8 batches, each batch contains 64 concurrent queries.
 Query files are provided (in `query_input` folder), the queries for each graph are generated based on Section 4.1 of the paper.
 `-batch` denotes the batch size, `-max_combination` denotes the total number of queries to evaluate. [graph] should be a weighted graph in adjacency format. User can use Ligra's tool to convert SNAP graph format to adjacency format and add random weights.
-A smaller graph (LiveJournal) has been provided inside the `ae-data` folder. The GridGrid graph format (used by GraphM) for LJ is also provided in `ae-data/graphm`.
+A smaller graph (LiveJournal) has been provided inside the `ae-data` folder. The GridGrid graph format (used by GraphM) for LJ is also provided in `ae-data/graphm`. [Google Drive](https://drive.google.com/file/d/195KcKhRBRZnA-R2OgRD6FWkV32u5lKL_/view?usp=sharing).
+
 
 There are some variants of Glign in the paper which are summarized below:
 | **Variant** | **parameters**               |
@@ -73,7 +74,7 @@ The results are stored in `../results/[name]`.
 ```
 bash run_profilings.sh [name] [graph_path] [query_file]
 ```
-For example, to run experiments for LJ, use `bash run_experiments.sh LJ ../ae-data/soc-LiveJournal1.weighted.adj ../query_input/LJ_queries.txt`
+For example, to run experiments for LJ, use `bash run_experiments.sh LJ ../ae-data/soc-LiveJournal1.weighted.adj ../query_input/LJ_queries.txt` .
 
 2. To run performance tests in Krill (under `Krill-AE/apps` directory):
 ```
