@@ -15,8 +15,7 @@ Compilers
 
 * g++ &gt;= 5.3.0 and &lt;= 7.4.0 with support for Cilk Plus
 
-After the appropriate environment variables are set, to compile,
-first checkout `ae-checkin` branch and run
+To compile, first checkout `ae-checkin` branch, cd into `apps` folder and run
 
 ```
 $ bash compile.sh
@@ -32,7 +31,8 @@ $ ./SSSP_Batch -option glign -batch 64 -max_combination 512 -mode 3 -delay -qf [
 ``` 
 The above will evaluate 512 queries in 8 batches, each batch contains 64 concurrent queries.
 Query files are provided (in `query_input` folder), the queries for each graph are generated based on Section 4.1 of the paper.
-`-batch` denotes the batch size, `-max_combination` denotes the total number of queries to evaluate. [graph] should be weighted graph in adjacency format. User can use Ligra's tool to convert SNAP graph format to adjacency format and add random weights.
+`-batch` denotes the batch size, `-max_combination` denotes the total number of queries to evaluate. [graph] should be a weighted graph in adjacency format. User can use Ligra's tool to convert SNAP graph format to adjacency format and add random weights.
+A smaller graph (LiveJournal) has been provided inside the `ae-data` folder. The GridGrid graph format (used by GraphM) for LJ is also provided in `ae-data/graphm`.
 
 There are some variants of Glign in the paper which are summarized below:
 | **Variant** | **parameters**               |
@@ -58,7 +58,7 @@ In the future release, we will simpilify the config parameters for different set
 
 Reproducing figures and tables in the paper
 -------
-After converting SNAP graphs to adjacency graphs for Ligra and Krill, run the following commands (under the `apps` folder):
+After converting SNAP graphs to adjacency graphs for Ligra and Krill, run the following commands (under the `.../Glign/apps` folder):
 
 The overall performance tests in Glign:
 ```
@@ -66,100 +66,103 @@ bash run_experiments.sh [name] [graph_path] [query_file]
 ```
 [name] should be the abbreviation of tested graphs in the paper: LJ, WP, UK2, TW, FR, RDCA, RDUS.
 [graph_path] is the location of weighted adjacency graph.
-[query_file] is the query input (in `../query_input/`).
+[query_file] is the query input (`../query_input/[name]`).
 The results are stored in `../results/[name]`.
 
-To run profiling experiments in Glign:
+1. To run profiling experiments in Glign:
 ```
 bash run_profilings.sh [name] [graph_path] [query_file]
 ```
+For example, to run experiments for LJ, use `bash run_experiments.sh LJ ../ae-data/soc-LiveJournal1.weighted.adj ../query_input/LJ_queries.txt`
 
-To run performance tests in Krill (under `Krill-AE/apps` directory):
+2. To run performance tests in Krill (under `Krill-AE/apps` directory):
 ```
 bash compile_benchmarks.sh
 bash run_experiments.sh [name] [graph_path] [query_file] [output_path]
 ```
 Note that [output_path] is the root directory of Glign (`.../Glign-AE`).
 
-To run profiling experiments in **Krill** (under `Krill-AE/apps` directory):
+3. To run profiling experiments in **Krill** (under `Krill-AE/apps` directory):
 ```
 bash run_profilings.sh [name] [graph_path] [query_file] [output_path]
 ```
 
-To run performance tests in **GraphM** (under `GraphM-AE` directory):
+4. To run performance tests in **GraphM** (under `GraphM-AE` directory):
 ```
 bash run_experiments.sh [name] [graph_path] [query_file] [output_path] [graph_size]
 ```
 Note that [graph_size] is a required input parameter by GraphM. Use 828 for LJ, 5247 for WP, 17621 for TW, 21673 for FR, 3142 for UK2.
 [output_path] is the root directory of Glign (`.../Glign-AE`).
 
-To run profiling experiments in GraphM (under `GraphM-AE` directory):
+5. To run profiling experiments in GraphM (under `GraphM-AE` directory):
 ```
 bash run_profilings.sh [name] [graph_path] [query_file] [output_path] [graph_size]
 ```
-*Generating data for figures and tables*
+
+**Generating data for figures and tables**
+
 Under the `.../Glign-AE/results` directory and run the following command to:
 
-Generate data for Figure 11:
+1. Generate data for Figure 11:
 ```
 bash ./scripts/extract_figure_11.sh [graph_abbr]
 ```
 [graph_abbr] is the name of graph, use LJ for LiveJournal.
 
-Generate data for Figure 12:
+2. Generate data for Figure 12:
 ```
 bash ./scripts/extract_figure_12.sh [graph_abbr]
 ```
 
-Generate data for Figure 13:
+3. Generate data for Figure 13:
 ```
 bash ./scripts/extract_figure_13.sh [graph_abbr]
 ```
 
-Generate data for Figure 14:
+4. Generate data for Figure 14:
 ```
 bash ./scripts/extract_figure_14.sh [graph_abbr]
 ```
 
-Generate data for Figure 15:
+5. Generate data for Figure 15:
 ```
 bash ./scripts/extract_figure_15.sh [graph_abbr]
 ```
 
-Generate data for Figure 16:
+6. Generate data for Figure 16:
 ```
 bash ./scripts/extract_figure_16.sh [graph_abbr]
 ```
 
-Generate data for Table 8:
+7. Generate data for Table 8:
 ```
 bash ./scripts/extract_table_8.sh [graph_abbr]
 ```
 
-Generate data for Table 9:
+8. Generate data for Table 9:
 ```
 bash ./scripts/extract_table_9.sh [graph_abbr]
 ```
 The cache misses are collected by `perf` tool, please make sure the CPU supports related hardware counters.
 
-Generate data for Table 10:
+9. Generate data for Table 10:
 ```
 bash ./scripts/extract_table_10.sh [graph_abbr]
 ```
 
-Generate data for Table 12:
+10. Generate data for Table 12:
 ```
 bash ./scripts/extract_table_12.sh [graph_abbr]
 ```
 
-Generate data for Table 13:
+11. Generate data for Table 13:
 ```
 ../apps/SSSP_Batch -option ground-truth -batch 2 -max_combination 512 -qf ../query_input/LJ_queries.txt ../ae-data/soc-LiveJournal1.weighted.adj
 ```
 The results table will be printed in the terminal after the program finishes.
 
-Data for Table 14:
+12. Data for Table 14:
 Please check any of Glign's output file inside the results folder, there is a line `Profiling cost: ` in each file.
 
-Data for Table 15:
+13. Data for Table 15:
 This is similar to Figure 11.
