@@ -48,20 +48,27 @@ for bench in SSSP BFS SSWP SSNP Viterbi Heter; do
 
     #graphm
     if [ "$current_bench" == "SSSP" ]; then
-        bench=concurrent_sssp
+        bench=sssp
     elif [ "$current_bench" == "BFS" ]; then
-        bench=concurrent_bfs
+        bench=bfs
     elif [ "$current_bench" == "SSWP" ]; then
-        bench=concurrent_sswp
+        bench=sswp
     elif [ "$current_bench" == "SSNP" ]; then
-        bench=concurrent_ssnp
+        bench=ssnp
     elif [ "$current_bench" == "Viterbi" ]; then
-        bench=concurrent_viterbi
+        bench=viterbi
     elif [ "$current_bench" == "Heter" ]; then
-        bench=concurrent_heter
+        bench=heter
     fi
-    file="${cur_dir}/graphm/${graph}/${bench}_graphm.txt"
-    graphm_time=`grep -e 'iterations of concurrent jobs took ' $file | awk '{print $(NF-1)}'`
+
+    if [ -e "${cur_dir}/graphm/${graph}/${bench}_res.txt" ]; then
+        `rm "${cur_dir}/graphm/${graph}/${bench}_res.txt"`
+    fi
+    cat ${cur_dir}/graphm/${graph}/concurrent_${bench}_graphm*.txt >> "${cur_dir}/graphm/${graph}/${bench}_res.txt"
+    file="${cur_dir}/graphm/${graph}/${bench}_res.txt"
+    graphm_time=`grep -e 'iterations of concurrent jobs took ' $file | awk '{SUM += $(NF-1)} END {print SUM }'`
+    # {print $(NF-1)}'`
+    # echo $graphm_time
     speedup=$(echo "scale=2;(($seq / ${graphm_time}))" | bc)
     echo "GraphM ${graph} ${bench} speedup: ${speedup}"
 

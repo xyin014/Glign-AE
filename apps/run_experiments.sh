@@ -156,11 +156,11 @@ bench=Viterbi
 for bsize in 2 4 8 16 32 64 128; do
     echo $bsize
     # running glign-batch
-    ./${bench}_Batch -option glign -batch $bsize -max_combination 512 -mode 3 -qf $query_file $graph_path > ${output_path}/${bench}_glign_batch_${name}_${bsize}.txt
+    ./${bench}_Batch -option glign -batch $bsize -max_combination $total -mode 3 -qf $query_file $graph_path > ${output_path}/${bench}_glign_batch_${name}_${bsize}.txt
     # running gling-inter
-    ./${bench}_Batch -option glign -batch $bsize -max_combination 512 -mode 2 -delay -qf $query_file $graph_path > ${output_path}/${bench}_glign_inter_${name}_${bsize}.txt
+    ./${bench}_Batch -option glign -batch $bsize -max_combination $total -mode 2 -delay -qf $query_file $graph_path > ${output_path}/${bench}_glign_inter_${name}_${bsize}.txt
     # running ligra-c
-    ./${bench}_Batch -option ligra-c -batch $bsize -max_combination 512 -mode 3 -delay -qf $query_file $graph_path > ${output_path}/${bench}_ligra_c_${name}_${bsize}.txt
+    ./${bench}_Batch -option ligra-c -batch $bsize -max_combination $total -mode 3 -delay -qf $query_file $graph_path > ${output_path}/${bench}_ligra_c_${name}_${bsize}.txt
 done
 
 date
